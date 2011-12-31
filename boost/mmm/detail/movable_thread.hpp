@@ -18,17 +18,17 @@
 namespace boost { namespace mmm {
 
 namespace detail {
+#if defined(BOOST_MMM_THREAD_SUPPORTS_MOVE_BASED_MOVE)
+using boost::thread;
+#else
 class BOOST_THREAD_DECL thread;
+#endif
 } // namespace boost::mmm::detail
 using detail::thread;
 
 namespace detail {
 
-#if defined(BOOST_MMM_THREAD_SUPPORTS_MOVE_BASED_MOVE)
-
-using boost::thread;
-
-#else
+#if !defined(BOOST_MMM_THREAD_SUPPORTS_MOVE_BASED_MOVE)
 
 class BOOST_THREAD_DECL thread : public boost::thread
 {
