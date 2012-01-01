@@ -1,4 +1,4 @@
-//          Copyright Kohei Takahashi 2011.
+//          Copyright Kohei Takahashi 2011 - 2012.
 // Distributed under the Boost Software License, Version 1.0.
 //    (See accompanying file LICENSE_1_0.txt or copy at
 //          http://www.boost.org/LICENSE_1_0.txt)
@@ -17,31 +17,24 @@
 #include <boost/assert.hpp>
 #endif
 #include <boost/ref.hpp>
-#include <boost/functional/hash.hpp>
-#include <boost/move/move.hpp>
 
 #include <boost/thread/thread.hpp>
 #include <boost/mmm/detail/movable_thread.hpp>
-#include <boost/thread/mutex.hpp>
-#include <boost/thread/shared_mutex.hpp>
 #include <boost/context/context.hpp>
 
 #include <boost/container/allocator/allocator_traits.hpp>
-#include <boost/container/list.hpp>
 #if defined(BOOST_MMM_THREAD_SUPPORTS_HASHABLE_THREAD_ID)
 #include <boost/unordered_map.hpp>
+#include <boost/functional/hash.hpp>
 #else
 #include <boost/container/flat_map.hpp>
 #endif
 
+#include <boost/mmm/strategy_traits.hpp>
+
 namespace boost { namespace mmm {
 
-template <typename Allocator = std::allocator<int> >
-class scheduler;
-
-typedef scheduler<> default_scheduler;
-
-template <typename Allocator>
+template <typename Strategy, typename Allocator = std::allocator<int> >
 class scheduler
 {
     void
@@ -50,6 +43,7 @@ class scheduler
     }
 
 public:
+    typedef Strategy strategy_type;
     typedef Allocator allocator_type;
     typedef std::size_t size_type;
 
@@ -63,6 +57,7 @@ public:
 #if !defined(BOOST_MMM_CONTAINER_BREAKING_EMPLACE_RETURN_TYPE)
             std::pair<typename kernels_type::iterator, bool> r =
 #endif
+            // Call Boost.Move's boost::move via ADL
             _m_kernels.emplace(th.get_id(), move(th));
 #if !defined(BOOST_MMM_CONTAINER_BREAKING_EMPLACE_RETURN_TYPE)
             BOOST_ASSERT(r.second);
@@ -71,40 +66,41 @@ public:
     }
 
 private:
-    typedef contexts::context context_type;
     typedef container::allocator_traits<allocator_type> allocator_traits;
+    typedef mmm::strategy_traits<strategy_type> strategy_traits;
 
-    typedef
-      typename allocator_traits::template rebind_alloc<
-        std::pair<const thread::id, thread> >
-    thread_id_allocator_type;
-    typedef
-      typename allocator_traits::template rebind_alloc<context_type>
-    context_allocator_type;
-
-    typedef
+    template <typename Key, typename Elem>
+    struct map_type
+    {
 #if defined(BOOST_MMM_THREAD_SUPPORTS_HASHABLE_THREAD_ID)
-      unordered_map<
+        typedef const Key _alloc_key_type;
 #else
-      container::flat_map<
+        typedef       Key _alloc_key_type;
 #endif
-        thread::id
-      , thread
-#if defined(BOOST_MMM_THREAD_SUPPORTS_HASHABLE_THREAD_ID)
-      , hash<thread::id>
-      , std::equal_to<thread::id>
-#else
-      , std::less<thread::id>
-#endif
-      , thread_id_allocator_type>
-    kernels_type;
-    typedef
-      container::list<context_type, context_allocator_type>
-    users_type;
 
-    mutable shared_mutex _m_sm;
-    kernels_type         _m_kernels;
-    users_type           _m_users;
+        typedef
+          typename allocator_traits::template rebind_alloc<
+            std::pair<_alloc_key_type, Elem> >
+        _alloc_type;
+
+        typedef
+#if defined(BOOST_MMM_THREAD_SUPPORTS_HASHABLE_THREAD_ID)
+          unordered_map<Key, Elem, hash<Key>, std::equal_to<Key>, _alloc_type>
+#else
+          container::flat_map<Key, Elem, std::less<Key>, _alloc_type>
+#endif
+        type;
+    }; // template class map_type
+
+    typedef
+      typename strategy_traits::template users<contexts::context, allocator_type>
+    users_traits;
+
+    typedef typename map_type<thread::id, thread>::type kernels_type;
+    typedef typename users_traits::pool_type users_type;
+
+    kernels_type _m_kernels;
+    users_type   _m_users;
 }; // template class scheduler
 
 } } // namespace boost::mmm
