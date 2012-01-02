@@ -17,6 +17,7 @@
 #include <boost/assert.hpp>
 #endif
 #include <boost/ref.hpp>
+#include <boost/noncopyable.hpp>
 
 #include <boost/thread/thread.hpp>
 #include <boost/mmm/detail/movable_thread.hpp>
@@ -35,10 +36,12 @@
 namespace boost { namespace mmm {
 
 template <typename Strategy, typename Allocator = std::allocator<int> >
-class scheduler
+class scheduler : private boost::noncopyable
 {
+    typedef scheduler this_type;
+
     void
-    _m_exec() const
+    _m_exec()
     {
     }
 
