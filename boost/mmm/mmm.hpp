@@ -40,9 +40,21 @@ class scheduler : private boost::noncopyable
 {
     typedef scheduler this_type;
 
+    friend class context_guard<this_type>;
+
     void
     _m_exec()
     {
+        strategy_traits traits;
+        typedef typename strategy_traits::context_type context_type;
+
+        // TODO Block and wait to be able to get least one context.
+        while (true)
+        {
+            context_guard<this_type> guard(*this, traits);
+
+            // TODO: Resume and continue to execute user thread.
+        }
     }
 
 public:
@@ -71,6 +83,7 @@ public:
 private:
     typedef container::allocator_traits<allocator_type> allocator_traits;
 
+    friend class strategy_traits<strategy_type, contexts::context, allocator_type>;
     typedef
       mmm::strategy_traits<strategy_type, contexts::context, allocator_type>
     strategy_traits;
