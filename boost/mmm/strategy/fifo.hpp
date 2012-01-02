@@ -6,7 +6,7 @@
 #ifndef BOOST_MMM_STRATEGY_FIFO_HPP
 #define BOOST_MMM_STRATEGY_FIFO_HPP
 
-#include <exception>
+#include <stdexcept>
 
 #include <boost/mmm/detail/workaround.hpp>
 
@@ -46,7 +46,7 @@ struct strategy_traits<strategy::fifo, Context, Allocator>
         if (!pool.size())
         {
             // XXX: workaround: should block and wait notify
-            throw std::exception(__FILE__ "(" BOOST_PP_STRINGIZE(__LINE__) "): workaround");
+            throw std::out_of_range(__FILE__ "(" BOOST_PP_STRINGIZE(__LINE__) "): workaround");
         }
         // Call boost::move via ADL
         context_type ctx = move(pool.front());
