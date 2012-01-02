@@ -70,7 +70,10 @@ public:
 
 private:
     typedef container::allocator_traits<allocator_type> allocator_traits;
-    typedef mmm::strategy_traits<strategy_type> strategy_traits;
+
+    typedef
+      mmm::strategy_traits<strategy_type, contexts::context, allocator_type>
+    strategy_traits;
 
     template <typename Key, typename Elem>
     struct map_type
@@ -95,12 +98,8 @@ private:
         type;
     }; // template class map_type
 
-    typedef
-      typename strategy_traits::template users<contexts::context, allocator_type>
-    users_traits;
-
     typedef typename map_type<thread::id, thread>::type kernels_type;
-    typedef typename users_traits::pool_type users_type;
+    typedef typename strategy_traits::pool_type users_type;
 
     kernels_type _m_kernels;
     users_type   _m_users;

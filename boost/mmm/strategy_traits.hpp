@@ -10,7 +10,7 @@
 
 namespace boost { namespace mmm {
 
-template <typename Strategy>
+template <typename Strategy, typename Context, typename Allocator>
 struct strategy_traits {}; // template class strategy_traits
 
 namespace strategy {} // namespace boost::mmm::strategy

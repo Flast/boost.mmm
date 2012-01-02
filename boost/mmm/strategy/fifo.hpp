@@ -25,43 +25,47 @@ struct fifo {}; // struct fifo
 
 } // namespace boost::mmm::strategy
 
-template <>
-struct strategy_traits<strategy::fifo>
+template <typename Context, typename Allocator>
+struct strategy_traits<strategy::fifo, Context, Allocator>
 {
-    template <typename Context, typename Allocator>
-    struct users
+    typedef Context context_type;
+
+    typedef container::allocator_traits<Allocator> _allocator_traits;
+    typedef typename _allocator_traits::template rebind_alloc<context_type> _allocator_type;
+
+    typedef container::list<context_type, _allocator_type> pool_type;
+
+    // FIXME: should lock to be thread safe
+    template <typename Scheduler>
+    context_type
+    pop_ctx(Scheduler &scheduler)
     {
-        typedef Context context_type;
+        // FIXME: use scheduler traits
+        pool_type &pool = scheduler._m_users;
 
-        typedef container::allocator_traits<Allocator> _allocator_traits;
-        typedef typename _allocator_traits::template rebind_alloc<context_type> _allocator_type;
-
-        typedef container::list<context_type, _allocator_type> pool_type;
-
-        // FIXME: should lock to be thread safe
-        context_type
-        pop_ctx(pool_type &pool)
+        if (!pool.size())
         {
-            if (pool.size() < 0)
-            {
-                // XXX: workaround: should block and wait notify
-                throw std::exception(__FILE__ "(" BOOST_PP_STRINGIZE(__LINE__) "): workaround");
-            }
-            // Call boost::move via ADL
-            context_type ctx = move(pool.front());
-            pool.pop_front();
-
-            return move(ctx);
+            // XXX: workaround: should block and wait notify
+            throw std::exception(__FILE__ "(" BOOST_PP_STRINGIZE(__LINE__) "): workaround");
         }
+        // Call boost::move via ADL
+        context_type ctx = move(pool.front());
+        pool.pop_front();
 
-        // FIXME: should lock to be thread safe
-        void
-        push_ctx(pool_type &pool, context_type ctx)
-        {
-            // Call boost::move using ADL
-            pool.push_back(move(ctx));
-        }
-    }; // template class users
+        return move(ctx);
+    }
+
+    // FIXME: should lock to be thread safe
+    template <typename Scheduler>
+    void
+    push_ctx(Scheduler &scheduler, context_type ctx)
+    {
+        // FIXME: use scheduler traits
+        pool_type &pool = scheduler._m_users;
+
+        // Call boost::move using ADL
+        pool.push_back(move(ctx));
+    }
 }; // template class strategy_traits<strategy::fifo>
 
 } } // namespace boost::mmm
