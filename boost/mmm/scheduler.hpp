@@ -23,6 +23,11 @@
 #include <boost/mmm/detail/movable_thread.hpp>
 #include <boost/context/context.hpp>
 
+#include <boost/thread/condition_variable.hpp>
+#include <boost/thread/mutex.hpp>
+#include <boost/thread/locks.hpp>
+#include <boost/mmm/detail/locks.hpp>
+
 #include <boost/container/allocator/allocator_traits.hpp>
 #if defined(BOOST_MMM_THREAD_SUPPORTS_HASHABLE_THREAD_ID)
 #include <boost/unordered_map.hpp>
@@ -47,14 +52,23 @@ class scheduler : private boost::noncopyable
     void
     _m_exec()
     {
-        strategy_traits traits;
         typedef typename strategy_traits::context_type context_type;
+        typedef context_guard<this_type> context_guard;
+        typedef scheduler_traits<this_type> scheduler_traits;
 
-        // TODO Block and wait to be able to get least one context.
+        strategy_traits traits;
+
         while (true)
         {
-            context_guard<this_type> guard(scheduler_traits<this_type>(*this), traits);
+            // Lock until to be able to get least one context.
+            unique_lock<mutex> guard(_m_mtx);
+            // TODO: Check interrupts.
+            while (!_m_users.size()) { _m_cond.wait(guard); }
 
+            // TODO: Should notify one via _m_cond when context is not finished.
+            context_guard ctx_guard(scheduler_traits(*this), traits);
+
+            detail::unique_unlock<mutex> unguard(guard);
             // TODO: Resume and continue to execute user thread.
         }
     }
@@ -115,8 +129,10 @@ private:
     typedef typename map_type<thread::id, thread>::type kernels_type;
     typedef typename strategy_traits::pool_type users_type;
 
-    kernels_type _m_kernels;
-    users_type   _m_users;
+    mutex              _m_mtx;
+    condition_variable _m_cond;
+    kernels_type       _m_kernels;
+    users_type         _m_users;
 }; // template class scheduler
 
 } } // namespace boost::mmm
