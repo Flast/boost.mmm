@@ -3,8 +3,8 @@
 //    (See accompanying file LICENSE_1_0.txt or copy at
 //          http://www.boost.org/LICENSE_1_0.txt)
 
-#ifndef BOOST_MMM_MMM_HPP
-#define BOOST_MMM_MMM_HPP
+#ifndef BOOST_MMM_SCHEDULER_HPP
+#define BOOST_MMM_SCHEDULER_HPP
 
 #include <cstddef>
 #include <utility>
