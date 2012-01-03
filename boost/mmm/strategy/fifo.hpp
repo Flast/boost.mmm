@@ -12,6 +12,7 @@
 
 #include <boost/preprocessor/stringize.hpp>
 
+#include <boost/intrusive/detail/mpl.hpp>
 #include <boost/container/allocator/allocator_traits.hpp>
 #include <boost/container/list.hpp>
 
@@ -36,12 +37,11 @@ struct strategy_traits<strategy::fifo, Context, Allocator>
     typedef container::list<context_type, _allocator_type> pool_type;
 
     // FIXME: should lock to be thread safe
-    template <typename Scheduler>
+    template <typename SchedulerTraits>
     context_type
-    pop_ctx(Scheduler &scheduler)
+    pop_ctx(SchedulerTraits traits)
     {
-        // FIXME: use scheduler traits
-        pool_type &pool = scheduler._m_users;
+        pool_type &pool = traits.pool();
 
         if (!pool.size())
         {
@@ -56,12 +56,11 @@ struct strategy_traits<strategy::fifo, Context, Allocator>
     }
 
     // FIXME: should lock to be thread safe
-    template <typename Scheduler>
+    template <typename SchedulerTraits>
     void
-    push_ctx(Scheduler &scheduler, context_type ctx)
+    push_ctx(SchedulerTraits traits, context_type ctx)
     {
-        // FIXME: use scheduler traits
-        pool_type &pool = scheduler._m_users;
+        pool_type &pool = traits.pool();
 
         // Call boost::move using ADL
         pool.push_back(move(ctx));

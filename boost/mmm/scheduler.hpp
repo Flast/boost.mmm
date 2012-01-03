@@ -32,6 +32,7 @@
 #endif
 
 #include <boost/mmm/strategy_traits.hpp>
+#include <boost/mmm/scheduler_traits.hpp>
 
 namespace boost { namespace mmm {
 
@@ -41,6 +42,7 @@ class scheduler : private boost::noncopyable
     typedef scheduler this_type;
 
     friend class context_guard<this_type>;
+    friend struct scheduler_traits<this_type>;
 
     void
     _m_exec()
@@ -51,7 +53,7 @@ class scheduler : private boost::noncopyable
         // TODO Block and wait to be able to get least one context.
         while (true)
         {
-            context_guard<this_type> guard(*this, traits);
+            context_guard<this_type> guard(scheduler_traits<this_type>(*this), traits);
 
             // TODO: Resume and continue to execute user thread.
         }
@@ -83,7 +85,6 @@ public:
 private:
     typedef container::allocator_traits<allocator_type> allocator_traits;
 
-    friend class strategy_traits<strategy_type, contexts::context, allocator_type>;
     typedef
       mmm::strategy_traits<strategy_type, contexts::context, allocator_type>
     strategy_traits;

@@ -9,8 +9,9 @@
 #include <boost/mmm/detail/workaround.hpp>
 
 #include <boost/config.hpp>
-
 #include <boost/noncopyable.hpp>
+
+#include <boost/mmm/scheduler_traits.hpp>
 
 namespace boost { namespace mmm {
 
@@ -22,6 +23,7 @@ namespace strategy {} // namespace boost::mmm::strategy
 template <typename Scheduler>
 class context_guard : private boost::noncopyable
 {
+    typedef mmm::scheduler_traits<Scheduler> scheduler_traits;
     typedef typename Scheduler::strategy_traits strategy_traits;
     typedef typename strategy_traits::context_type context_type;
     typedef typename strategy_traits::pool_type pool_type;
@@ -34,10 +36,10 @@ class context_guard : private boost::noncopyable
 public:
     // The default ctor's costs is not so expensive.
     explicit
-    context_guard(Scheduler &scheduler, strategy_traits &traits)
-      : _m_scheduler(scheduler), _m_traits(traits)
+    context_guard(scheduler_traits scheduler, strategy_traits strategy)
+      : _m_scheduler(scheduler), _m_strategy(strategy)
     {
-        _m_traits.pop_ctx(_m_scheduler).swap(_m_ctx);
+        _m_strategy.pop_ctx(_m_scheduler).swap(_m_ctx);
     }
 
     ~context_guard()
@@ -45,7 +47,7 @@ public:
         // Back context to pool if it still not finished.
         if (is_suspended())
         {
-            _m_traits.push_ctx(_m_scheduler, move(_m_ctx));
+            _m_strategy.push_ctx(_m_scheduler, move(_m_ctx));
         }
     }
 
@@ -69,9 +71,9 @@ private:
         return _m_ctx && !_m_ctx.is_complete();
     }
 
-    Scheduler       &_m_scheduler;
-    strategy_traits &_m_traits;
-    context_type    _m_ctx;
+    scheduler_traits _m_scheduler;
+    strategy_traits  _m_strategy;
+    context_type     _m_ctx;
 }; // template class context_guard
 
 } } // namespace boost::mmm
