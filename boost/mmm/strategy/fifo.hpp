@@ -36,7 +36,6 @@ struct strategy_traits<strategy::fifo, Context, Allocator>
 
     typedef container::list<context_type, _allocator_type> pool_type;
 
-    // FIXME: should lock to be thread safe
     template <typename SchedulerTraits>
     context_type
     pop_ctx(SchedulerTraits traits)
@@ -55,7 +54,6 @@ struct strategy_traits<strategy::fifo, Context, Allocator>
         return move(ctx);
     }
 
-    // FIXME: should lock to be thread safe
     template <typename SchedulerTraits>
     void
     push_ctx(SchedulerTraits traits, context_type ctx)
