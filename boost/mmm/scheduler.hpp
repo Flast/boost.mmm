@@ -65,11 +65,15 @@ class scheduler : private boost::noncopyable
             // TODO: Check interrupts.
             while (!_m_users.size()) { _m_cond.wait(guard); }
 
-            // TODO: Should notify one via _m_cond when context is not finished.
             context_guard ctx_guard(scheduler_traits(*this), traits);
 
-            detail::unique_unlock<mutex> unguard(guard);
-            // TODO: Resume and continue to execute user thread.
+            {
+                detail::unique_unlock<mutex> unguard(guard);
+                // TODO: Resume and continue to execute user thread.
+            }
+
+            // Notify one when context is not finished.
+            if (ctx_guard) { _m_cond.notify_one(); }
         }
     }
 
