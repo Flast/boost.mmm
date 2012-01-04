@@ -10,6 +10,7 @@
 #include <utility>
 #include <memory>
 #include <functional>
+#include <exception>
 
 #include <boost/mmm/detail/workaround.hpp>
 
@@ -58,12 +59,19 @@ class scheduler : private boost::noncopyable
 
         strategy_traits traits;
 
+        // NOTICE: Do not use _m_terminate as condition: evaling non-atomic type
+        // is not safe in non-mutexed statement even if qualified as volatile.
         while (true)
         {
             // Lock until to be able to get least one context.
             unique_lock<mutex> guard(_m_mtx);
-            // TODO: Check interrupts.
-            while (!_m_users.size()) { _m_cond.wait(guard); }
+            // Check and breaking loop when destructing scheduler.
+            while (!_m_terminate && !_m_users.size())
+            {
+                // TODO: Check interrupts.
+                _m_cond.wait(guard);
+            }
+            if (_m_terminate) { break; }
 
             context_guard ctx_guard(scheduler_traits(*this), traits);
 
@@ -84,6 +92,7 @@ public:
 
     explicit
     scheduler(size_type default_size)
+      : _m_terminate(false)
     {
         while (default_size--)
         {
@@ -98,6 +107,47 @@ public:
             BOOST_ASSERT(r.second);
 #endif
         }
+    }
+
+    // Call std::terminate: works similar to std::thread::~thread.
+    // Users should join all user thread before destruct.
+    ~scheduler()
+    {
+        if (joinable()) { std::terminate(); }
+
+        {
+            unique_lock<mutex> guard(_m_mtx);
+            _m_terminate = true;
+            _m_cond.notify_all();
+        }
+
+        typedef typename kernels_type::iterator iterator;
+        typedef typename kernels_type::const_iterator const_iterator;
+
+        const_iterator end = _m_kernels.end();
+        for (iterator itr = _m_kernels.begin(); itr != end; ++itr)
+        {
+            itr->second.join();
+        }
+    }
+
+    // Join all user threads.
+    void
+    join_all()
+    {
+        unique_lock<mutex> guard(_m_mtx);
+        while (_m_users.size())
+        {
+            _m_cond.wait(guard);
+            _m_cond.notify_one();
+        }
+    }
+
+    bool
+    joinable() const
+    {
+        unique_lock<mutex> guard(_m_mtx);
+        return _m_users.size() != 0;
     }
 
 private:
@@ -133,7 +183,9 @@ private:
     typedef typename map_type<thread::id, thread>::type kernels_type;
     typedef typename strategy_traits::pool_type users_type;
 
-    mutex              _m_mtx;
+    // TODO: Use atomic type. (e.g. Boost.Atomic
+    volatile bool      _m_terminate;
+    mutable mutex      _m_mtx;
     condition_variable _m_cond;
     kernels_type       _m_kernels;
     users_type         _m_users;
