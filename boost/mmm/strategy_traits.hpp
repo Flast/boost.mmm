@@ -66,7 +66,7 @@ public:
 
 private:
     bool
-    is_suspended()
+    is_suspended() const
     {
         return _m_ctx && !_m_ctx.is_complete();
     }
