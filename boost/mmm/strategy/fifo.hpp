@@ -6,11 +6,11 @@
 #ifndef BOOST_MMM_STRATEGY_FIFO_HPP
 #define BOOST_MMM_STRATEGY_FIFO_HPP
 
-#include <stdexcept>
-
 #include <boost/mmm/detail/workaround.hpp>
 
 #include <boost/preprocessor/stringize.hpp>
+
+#include <boost/assert.hpp>
 
 #include <boost/intrusive/detail/mpl.hpp>
 #include <boost/container/allocator/allocator_traits.hpp>
@@ -36,17 +36,14 @@ struct strategy_traits<strategy::fifo, Context, Allocator>
 
     typedef container::list<context_type, _allocator_type> pool_type;
 
+    // Pre-condition: pool.size() > 0 .
     template <typename SchedulerTraits>
     context_type
     pop_ctx(SchedulerTraits traits)
     {
         pool_type &pool = traits.pool();
+        BOOST_ASSERT(pool.size());
 
-        if (!pool.size())
-        {
-            // XXX: workaround: should block and wait notify
-            throw std::out_of_range(__FILE__ "(" BOOST_PP_STRINGIZE(__LINE__) "): workaround");
-        }
         // Call boost::move via ADL
         context_type ctx = move(pool.front());
         pool.pop_front();
@@ -54,13 +51,15 @@ struct strategy_traits<strategy::fifo, Context, Allocator>
         return move(ctx);
     }
 
+    // Pre-condition: Context is not a /not-a-context/ and not completed.
     template <typename SchedulerTraits>
     void
     push_ctx(SchedulerTraits traits, context_type ctx)
     {
+        BOOST_ASSERT(ctx && !ctx.is_complete());
         pool_type &pool = traits.pool();
 
-        // Call boost::move using ADL
+        // Call boost::move via ADL
         pool.push_back(move(ctx));
     }
 }; // template class strategy_traits<strategy::fifo>
