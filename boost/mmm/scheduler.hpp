@@ -20,6 +20,7 @@
 #endif
 #include <boost/ref.hpp>
 #include <boost/noncopyable.hpp>
+#include <boost/scope_exit.hpp>
 
 #include <boost/thread/thread.hpp>
 #include <boost/mmm/detail/movable_thread.hpp>
@@ -38,6 +39,7 @@
 #include <boost/container/flat_map.hpp>
 #endif
 
+#include <boost/mmm/detail/current_context.hpp>
 #include <boost/mmm/strategy_traits.hpp>
 #include <boost/mmm/scheduler_traits.hpp>
 
@@ -77,7 +79,15 @@ class scheduler : private boost::noncopyable
             context_guard ctx_guard(scheduler_traits(*this), traits);
 
             {
-                detail::unique_unlock<mutex> unguard(guard);
+                using namespace detail;
+                unique_unlock<mutex> unguard(guard);
+                BOOST_SCOPE_EXIT()
+                {
+                    current_context::set_current_ctx(0);
+                }
+                BOOST_SCOPE_EXIT_END
+                current_context::set_current_ctx(&ctx_guard.context());
+
                 // TODO: Resume and continue to execute user thread.
             }
 
