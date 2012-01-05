@@ -16,6 +16,7 @@
 
 #if !defined(BOOST_MMM_CONTAINER_BREAKING_EMPLACE_RETURN_TYPE)
 #include <boost/assert.hpp>
+#include <boost/mmm/detail/unused.hpp>
 #endif
 #include <boost/ref.hpp>
 #include <boost/noncopyable.hpp>
@@ -105,6 +106,7 @@ public:
             _m_kernels.emplace(th.get_id(), move(th));
 #if !defined(BOOST_MMM_CONTAINER_BREAKING_EMPLACE_RETURN_TYPE)
             BOOST_ASSERT(r.second);
+            BOOST_MMM_DETAIL_UNUSED(r);
 #endif
         }
     }
