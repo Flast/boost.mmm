@@ -51,6 +51,12 @@ public:
         }
     }
 
+    context_type &
+    context() { return _m_ctx; }
+
+    const context_type &
+    context() const { return _m_ctx; }
+
 #if defined(BOOST_NO_EXPLICIT_CONVERSION_OPERATORS)
     operator unspecified_bool_type() const
     {
@@ -68,7 +74,7 @@ private:
     bool
     is_suspended() const
     {
-        return _m_ctx && !_m_ctx.is_complete();
+        return context() && !context().is_complete();
     }
 
     scheduler_traits _m_scheduler;
