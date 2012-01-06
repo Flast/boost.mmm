@@ -82,7 +82,7 @@ private:
 }; // template class unique_unlock
 
 template <typename Mutex>
-void
+inline void
 swap(unique_unlock<Mutex> &a, unique_unlock<Mutex> &b)
 {
     a.swap(b);

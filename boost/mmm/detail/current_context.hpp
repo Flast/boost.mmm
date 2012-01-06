@@ -6,6 +6,8 @@
 #ifndef BOOST_MMM_DETAIL_CURRENT_CONTEXT_HPP
 #define BOOST_MMM_DETAIL_CURRENT_CONTEXT_HPP
 
+#include <boost/context/context.hpp>
+
 namespace boost { namespace mmm { namespace detail { namespace current_context {
 
 typedef contexts::context * context_type;
