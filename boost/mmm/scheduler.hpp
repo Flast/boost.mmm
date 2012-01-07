@@ -65,13 +65,25 @@ class scheduler : private boost::noncopyable
     friend class context_guard<this_type>;
     friend struct scheduler_traits<this_type>;
 
+public:
+    typedef Strategy strategy_type;
+    typedef Allocator allocator_type;
+    typedef std::size_t size_type;
+
+    typedef container::allocator_traits<allocator_type> allocator_traits;
+
+    typedef mmm::scheduler_traits<this_type> scheduler_traits;
+    typedef
+      mmm::strategy_traits<strategy_type, contexts::context, allocator_type>
+    strategy_traits;
+
+    typedef mmm::context_guard<this_type> context_guard;
+    typedef typename strategy_traits::context_type context_type;
+
+private:
     void
     _m_exec()
     {
-        typedef typename strategy_traits::context_type context_type;
-        typedef context_guard<this_type> context_guard;
-        typedef scheduler_traits<this_type> scheduler_traits;
-
         strategy_traits traits;
 
         // NOTICE: Do not use _m_terminate as condition: evaling non-atomic type
@@ -109,9 +121,6 @@ class scheduler : private boost::noncopyable
     }
 
 public:
-    typedef Strategy strategy_type;
-    typedef Allocator allocator_type;
-    typedef std::size_t size_type;
 
     explicit
     scheduler(size_type default_size)
@@ -169,18 +178,14 @@ public:
                                                                             \
     template <typename Fn BOOST_PP_ENUM_TRAILING_PARAMS(n_, typename Arg)>  \
     void                                                                    \
-    add_thread(                                                             \
-      std::size_t size                                                      \
-    , Fn fn BOOST_PP_ENUM_TRAILING_BINARY_PARAMS(n_, Arg, arg))             \
+    add_thread(std::size_t size, Fn fn BOOST_PP_ENUM_TRAILING_BINARY_PARAMS(n_, Arg, arg)) \
     {                                                                       \
-        typedef typename strategy_traits::context_type context_type;        \
         context_type ctx(                                                   \
           fn BOOST_PP_ENUM_TRAILING_PARAMS(n_, arg)                         \
         , size                                                              \
         , contexts::no_stack_unwind                                         \
         , contexts::return_to_caller);                                      \
                                                                             \
-        typedef scheduler_traits<this_type> scheduler_traits;               \
         unique_lock<mutex> guard(_m_mtx);                                   \
         strategy_traits().push_ctx(scheduler_traits(*this), move(ctx));     \
     }                                                                       \
@@ -202,10 +207,8 @@ public:
     {
         using contexts::no_stack_unwind;
         using contexts::return_to_caller;
-        typedef typename strategy_traits::context_type context_type;
         context_type ctx(fn, args..., size, no_stack_unwind, return_to_caller);
 
-        typedef scheduler_traits<this_type> scheduler_traits;
         unique_lock<mutex> guard(_m_mtx);
         strategy_traits().push_ctx(scheduler_traits(*this), move(ctx));
     }
@@ -231,12 +234,6 @@ public:
     }
 
 private:
-    typedef container::allocator_traits<allocator_type> allocator_traits;
-
-    typedef
-      mmm::strategy_traits<strategy_type, contexts::context, allocator_type>
-    strategy_traits;
-
     template <typename Key, typename Elem>
     struct map_type
     {
