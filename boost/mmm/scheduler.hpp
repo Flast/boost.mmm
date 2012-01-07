@@ -12,6 +12,7 @@
 #include <functional>
 #include <exception>
 
+#include <boost/config.hpp>
 #include <boost/mmm/detail/workaround.hpp>
 
 #if !defined(BOOST_MMM_CONTAINER_BREAKING_EMPLACE_RETURN_TYPE)
@@ -22,9 +23,20 @@
 #include <boost/noncopyable.hpp>
 #include <boost/scope_exit.hpp>
 
+#if defined(BOOST_NO_VARIADIC_TEMPLATES)
+#include <boost/preprocessor/arithmetic/inc.hpp>
+#include <boost/preprocessor/repetition/repeat.hpp>
+#include <boost/preprocessor/repetition/enum_trailing_params.hpp>
+#include <boost/preprocessor/repetition/enum_trailing_binary_params.hpp>
+#endif
+
+#include <boost/utility/enable_if.hpp>
+#include <boost/type_traits/is_same.hpp>
+
 #include <boost/thread/thread.hpp>
 #include <boost/mmm/detail/movable_thread.hpp>
 #include <boost/context/context.hpp>
+#include <boost/context/stack_utils.hpp>
 
 #include <boost/thread/condition_variable.hpp>
 #include <boost/thread/mutex.hpp>
@@ -142,6 +154,62 @@ public:
             itr->second.join();
         }
     }
+
+    // To prevent unnecessary coping, explicit instantiation with lvalue reference.
+#if defined(BOOST_NO_VARIADIC_TEMPLATES)
+#define BOOST_MMM_scheduler_add_thread(unused_z_, n_, unused_data_)         \
+    template <typename Fn BOOST_PP_ENUM_TRAILING_PARAMS(n_, typename Arg)>  \
+    typename disable_if<is_same<std::size_t, Fn> >::type                    \
+    add_thread(Fn fn BOOST_PP_ENUM_TRAILING_BINARY_PARAMS(n_, Arg, arg))    \
+    {                                                                       \
+        add_thread<Fn & BOOST_PP_ENUM_TRAILING_BINARY_PARAMS(n_, Arg, & BOOST_PP_INTERCEPT)>( \
+          contexts::default_stacksize()                                     \
+        , fn BOOST_PP_ENUM_TRAILING_PARAMS(n_, arg));                       \
+    }                                                                       \
+                                                                            \
+    template <typename Fn BOOST_PP_ENUM_TRAILING_PARAMS(n_, typename Arg)>  \
+    void                                                                    \
+    add_thread(                                                             \
+      std::size_t size                                                      \
+    , Fn fn BOOST_PP_ENUM_TRAILING_BINARY_PARAMS(n_, Arg, arg))             \
+    {                                                                       \
+        typedef typename strategy_traits::context_type context_type;        \
+        context_type ctx(                                                   \
+          fn BOOST_PP_ENUM_TRAILING_PARAMS(n_, arg)                         \
+        , size                                                              \
+        , contexts::no_stack_unwind                                         \
+        , contexts::return_to_caller);                                      \
+                                                                            \
+        typedef scheduler_traits<this_type> scheduler_traits;               \
+        unique_lock<mutex> guard(_m_mtx);                                   \
+        strategy_traits().push_ctx(scheduler_traits(*this), move(ctx));     \
+    }                                                                       \
+// BOOST_MMM_scheduler_add_thread
+    BOOST_PP_REPEAT(BOOST_PP_INC(BOOST_CONTEXT_ARITY), BOOST_MMM_scheduler_add_thread, ~)
+#undef BOOST_MMM_scheduler_add_thread
+#else
+    template <typename Fn, typename... Args>
+    typename disable_if<is_same<std::size_t, Fn> >::type
+    add_thread(Fn fn, Args... args)
+    {
+        using contexts::default_size;
+        add_thread<Fn &, Args &...>(default_size(), fn, args...);
+    }
+
+    template <typename Fn, typename... Args>
+    void
+    add_thread(std::size_t size, Fn fn, Args... args)
+    {
+        using contexts::no_stack_unwind;
+        using contexts::return_to_caller;
+        typedef typename strategy_traits::context_type context_type;
+        context_type ctx(fn, args..., size, no_stack_unwind, return_to_caller);
+
+        typedef scheduler_traits<this_type> scheduler_traits;
+        unique_lock<mutex> guard(_m_mtx);
+        strategy_traits().push_ctx(scheduler_traits(*this), move(ctx));
+    }
+#endif
 
     // Join all user threads.
     void
