@@ -22,6 +22,7 @@
 #include <boost/ref.hpp>
 #include <boost/noncopyable.hpp>
 #include <boost/scope_exit.hpp>
+#include <boost/lambda/bind.hpp>
 
 #if defined(BOOST_NO_VARIADIC_TEMPLATES)
 #include <boost/preprocessor/arithmetic/inc.hpp>
@@ -110,9 +111,10 @@ private:
                     current_context::set_current_ctx(0);
                 }
                 BOOST_SCOPE_EXIT_END
-                current_context::set_current_ctx(&ctx_guard.context());
 
-                // TODO: Resume and continue to execute user thread.
+                context_type &ctx = ctx_guard.context();
+                current_context::set_current_ctx(&ctx);
+                ctx.resume();
             }
 
             // Notify one when context is not finished.
@@ -120,8 +122,48 @@ private:
         }
     }
 
-public:
+    // To run context should call start(). However, cannot get informations
+    // about the context was started.
+    template <typename F>
+    struct context_starter
+    {
+        F _m_functor;
+        reference_wrapper<context_type> _m_ctx;
 
+        explicit
+        context_starter(const F &functor, context_type &ctx)
+          : _m_functor(functor), _m_ctx(ctx) {}
+
+        void
+        operator()() const
+        {
+            _m_ctx.get().suspend();
+            _m_functor();
+        }
+    }; // template struct context_starter
+
+    template <typename F>
+    static context_starter<F>
+    make_context_starter(const F &f, context_type &ctx)
+    {
+        return context_starter<F>(f, ctx);
+    }
+
+    void *
+    start_context(context_type &ctx)
+    {
+        using namespace detail;
+        BOOST_SCOPE_EXIT()
+        {
+            current_context::set_current_ctx(0);
+        }
+        BOOST_SCOPE_EXIT_END
+
+        current_context::set_current_ctx(&ctx);
+        return ctx.start();
+    }
+
+public:
     explicit
     scheduler(size_type default_size)
       : _m_terminate(false)
@@ -180,11 +222,14 @@ public:
     void                                                                    \
     add_thread(std::size_t size, Fn fn BOOST_PP_ENUM_TRAILING_BINARY_PARAMS(n_, Arg, arg)) \
     {                                                                       \
-        context_type ctx(                                                   \
-          fn BOOST_PP_ENUM_TRAILING_PARAMS(n_, arg)                         \
-        , size                                                              \
-        , contexts::no_stack_unwind                                         \
-        , contexts::return_to_caller);                                      \
+        using contexts::no_stack_unwind;                                    \
+        using contexts::return_to_caller;                                   \
+                                                                            \
+        context_type ctx;                                                   \
+        context_type(                                                       \
+          make_context_starter(lambda::bind(fn BOOST_PP_ENUM_TRAILING_PARAMS(n_, arg)), ctx) \
+        , size, no_stack_unwind, return_to_caller).swap(ctx);               \
+        start_context(ctx);                                                 \
                                                                             \
         unique_lock<mutex> guard(_m_mtx);                                   \
         strategy_traits().push_ctx(scheduler_traits(*this), move(ctx));     \
@@ -207,7 +252,12 @@ public:
     {
         using contexts::no_stack_unwind;
         using contexts::return_to_caller;
-        context_type ctx(fn, args..., size, no_stack_unwind, return_to_caller);
+
+        context_type ctx;
+        context_type(
+          make_context_starter(lambda::bind(fn, args...), ctx)
+        , size, no_stack_unwind, return_to_caller).swap(ctx);
+        start_context(ctx);
 
         unique_lock<mutex> guard(_m_mtx);
         strategy_traits().push_ctx(scheduler_traits(*this), move(ctx));
