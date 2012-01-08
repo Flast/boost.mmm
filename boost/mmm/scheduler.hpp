@@ -49,7 +49,7 @@
 #include <boost/unordered_map.hpp>
 #include <boost/functional/hash.hpp>
 #else
-#include <boost/container/flat_map.hpp>
+#include <boost/container/map.hpp>
 #endif
 
 #include <boost/mmm/detail/current_context.hpp>
@@ -296,22 +296,15 @@ private:
     template <typename Key, typename Elem>
     struct map_type
     {
-#if defined(BOOST_MMM_THREAD_SUPPORTS_HASHABLE_THREAD_ID)
-        typedef const Key _alloc_key_type;
-#else
-        typedef       Key _alloc_key_type;
-#endif
-
         typedef
-          typename allocator_traits::template rebind_alloc<
-            std::pair<_alloc_key_type, Elem> >
+          typename allocator_traits::template rebind_alloc<std::pair<const Key, Elem> >
         _alloc_type;
 
         typedef
 #if defined(BOOST_MMM_THREAD_SUPPORTS_HASHABLE_THREAD_ID)
           unordered_map<Key, Elem, hash<Key>, std::equal_to<Key>, _alloc_type>
 #else
-          container::flat_map<Key, Elem, std::less<Key>, _alloc_type>
+          container::map<Key, Elem, std::less<Key>, _alloc_type>
 #endif
         type;
     }; // template class map_type
