@@ -118,7 +118,11 @@ private:
             }
 
             // Notify one when context is not finished.
-            if (ctx_guard) { _m_cond.notify_one(); }
+            if (ctx_guard)
+            {
+                if (_m_join) { _m_cond.notify_all(); }
+                else { _m_cond.notify_one(); }
+            }
         }
     }
 
@@ -166,7 +170,7 @@ private:
 public:
     explicit
     scheduler(size_type default_size)
-      : _m_terminate(false)
+      : _m_terminate(false), _m_join(false)
     {
         while (default_size--)
         {
@@ -233,6 +237,7 @@ public:
                                                                             \
         unique_lock<mutex> guard(_m_mtx);                                   \
         strategy_traits().push_ctx(scheduler_traits(*this), move(ctx));     \
+        _m_cond.notify_one();                                               \
     }                                                                       \
 // BOOST_MMM_scheduler_add_thread
     BOOST_PP_REPEAT(BOOST_PP_INC(BOOST_CONTEXT_ARITY), BOOST_MMM_scheduler_add_thread, ~)
@@ -261,6 +266,7 @@ public:
 
         unique_lock<mutex> guard(_m_mtx);
         strategy_traits().push_ctx(scheduler_traits(*this), move(ctx));
+        _m_cond.notify_one();
     }
 #endif
 
@@ -269,11 +275,14 @@ public:
     join_all()
     {
         unique_lock<mutex> guard(_m_mtx);
+
+        _m_join = true;
         while (_m_users.size())
         {
             _m_cond.wait(guard);
             _m_cond.notify_one();
         }
+        _m_join = false;
     }
 
     bool
@@ -312,6 +321,7 @@ private:
 
     // TODO: Use atomic type. (e.g. Boost.Atomic
     volatile bool      _m_terminate;
+    volatile bool      _m_join;
     mutable mutex      _m_mtx;
     condition_variable _m_cond;
     kernels_type       _m_kernels;
