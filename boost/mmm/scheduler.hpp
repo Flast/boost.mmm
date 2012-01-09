@@ -66,6 +66,14 @@ class scheduler : private boost::noncopyable
     friend class context_guard<this_type>;
     friend struct scheduler_traits<this_type>;
 
+    enum scheduler_status
+    {
+        _st_terminate = 1 << 0,
+        _st_join      = 1 << 1,
+
+        _st_none = 0
+    };
+
 public:
     typedef Strategy strategy_type;
     typedef Allocator allocator_type;
@@ -94,12 +102,12 @@ private:
             // Lock until to be able to get least one context.
             unique_lock<mutex> guard(_m_mtx);
             // Check and breaking loop when destructing scheduler.
-            while (!_m_terminate && !_m_users.size())
+            while (!(_m_status & _st_terminate) && !_m_users.size())
             {
                 // TODO: Check interrupts.
                 _m_cond.wait(guard);
             }
-            if (_m_terminate) { break; }
+            if (_m_status & _st_terminate) { break; }
 
             context_guard ctx_guard(scheduler_traits(*this), traits);
 
@@ -120,7 +128,7 @@ private:
             // Notify one when context is not finished.
             if (ctx_guard)
             {
-                if (_m_join) { _m_cond.notify_all(); }
+                if (_m_status & _st_join) { _m_cond.notify_all(); }
                 else { _m_cond.notify_one(); }
             }
         }
@@ -170,7 +178,7 @@ private:
 public:
     explicit
     scheduler(size_type default_size)
-      : _m_terminate(false), _m_join(false)
+      : _m_status(_st_none)
     {
         while (default_size--)
         {
@@ -196,7 +204,7 @@ public:
 
         {
             unique_lock<mutex> guard(_m_mtx);
-            _m_terminate = true;
+            _m_status |= _st_terminate;
             _m_cond.notify_all();
         }
 
@@ -276,13 +284,13 @@ public:
     {
         unique_lock<mutex> guard(_m_mtx);
 
-        _m_join = true;
+        _m_status |= _st_join;
         while (_m_users.size())
         {
             _m_cond.wait(guard);
             _m_cond.notify_one();
         }
-        _m_join = false;
+        _m_status &= ~_st_join;
     }
 
     bool
@@ -313,8 +321,7 @@ private:
     typedef typename strategy_traits::pool_type users_type;
 
     // TODO: Use atomic type. (e.g. Boost.Atomic
-    volatile bool      _m_terminate;
-    volatile bool      _m_join;
+    volatile int       _m_status;
     mutable mutex      _m_mtx;
     condition_variable _m_cond;
     kernels_type       _m_kernels;
