@@ -53,6 +53,7 @@
 #endif
 
 #include <boost/mmm/detail/current_context.hpp>
+#include <boost/mmm/detail/context_guard.hpp>
 #include <boost/mmm/strategy_traits.hpp>
 #include <boost/mmm/scheduler_traits.hpp>
 
@@ -63,7 +64,7 @@ class scheduler : private boost::noncopyable
 {
     typedef scheduler this_type;
 
-    friend class context_guard<this_type>;
+    friend class detail::context_guard<this_type>;
     friend struct scheduler_traits<this_type>;
 
     enum scheduler_status
@@ -86,7 +87,7 @@ public:
       mmm::strategy_traits<strategy_type, contexts::context, allocator_type>
     strategy_traits;
 
-    typedef mmm::context_guard<this_type> context_guard;
+    typedef mmm::detail::context_guard<this_type> context_guard;
     typedef typename strategy_traits::context_type context_type;
 
 private:
