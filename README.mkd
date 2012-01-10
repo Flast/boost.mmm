@@ -1,0 +1,29 @@
+Boost.MMM
+=========
+
+Introduction:
+-------------
+
+> Boost.MMM is implementation of Many-to-Many thread Model.
+> <p style="color: red">This library is not part of Boost.</p>
+
+Installation:
+-------------
+
+> Boost.MMM depends on followings.
+>
+> * Boost 1.48.0
+> * Boost.Context (not in trunk, see [Boost.Context](https://github.com/olk/boost.context))
+
+License:
+--------
+
+             Copyright Kohei Takahashi 2011 - 2012.
+    Distributed under the Boost Software License, Version 1.0.
+       (See accompanying file LICENSE_1_0.txt or copy at
+             http://www.boost.org/LICENSE_1_0.txt)
+
+Author:
+-------
+
+> * Kohei Takahashi (flast@flast.jp)
