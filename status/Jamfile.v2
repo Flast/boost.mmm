@@ -1,0 +1,7 @@
+project status
+  : requirements <hardcode-dll-paths>true
+  ;
+
+import testing ;
+
+build-project ../libs/mmm/test ;
