@@ -1,0 +1,13 @@
+local rule test-each ( test : srcs * )
+{
+    local tests = ;
+    for local src in $(srcs)
+    {
+        tests += [ $(test) $(src) ] ;
+    }
+    return $(tests) ;
+}
+
+test-suite mmm
+  : [ test-each run : [ glob *.run.cpp ] ]
+  ;
