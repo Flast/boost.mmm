@@ -281,7 +281,6 @@ public:
         while (_m_users.size())
         {
             _m_cond.wait(guard);
-            _m_cond.notify_one();
         }
         _m_status &= ~_st_join;
     }
