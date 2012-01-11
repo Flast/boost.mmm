@@ -21,7 +21,6 @@
 #endif
 #include <boost/ref.hpp>
 #include <boost/noncopyable.hpp>
-#include <boost/scope_exit.hpp>
 #include <boost/lambda/bind.hpp>
 
 #if defined(BOOST_NO_VARIADIC_TEMPLATES)
@@ -96,7 +95,7 @@ private:
     {
         strategy_traits traits;
 
-        // NOTICE: Do not use _m_terminate as condition: evaling non-atomic type
+        // NOTICE: Do not use _m_status as condition: evaling non-atomic type
         // is not safe in non-mutexed statement even if qualified as volatile.
         while (true)
         {
@@ -115,15 +114,11 @@ private:
             {
                 using namespace detail;
                 unique_unlock<mutex> unguard(guard);
-                BOOST_SCOPE_EXIT()
-                {
-                    current_context::set_current_ctx(0);
-                }
-                BOOST_SCOPE_EXIT_END
-
                 context_type &ctx = ctx_guard.context();
+
                 current_context::set_current_ctx(&ctx);
                 ctx.resume();
+                current_context::set_current_ctx(0);
             }
 
             // Notify one when context is not finished.
@@ -166,14 +161,11 @@ private:
     start_context(context_type &ctx)
     {
         using namespace detail;
-        BOOST_SCOPE_EXIT()
-        {
-            current_context::set_current_ctx(0);
-        }
-        BOOST_SCOPE_EXIT_END
 
         current_context::set_current_ctx(&ctx);
-        return ctx.start();
+        void *vp = ctx.start();
+        current_context::set_current_ctx(0);
+        return vp;
     }
 
 public:
