@@ -38,6 +38,7 @@
 #include <boost/context/context.hpp>
 #include <boost/context/stack_utils.hpp>
 
+#include <boost/atomic.hpp>
 #include <boost/thread/condition_variable.hpp>
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/locks.hpp>
@@ -95,9 +96,7 @@ private:
     {
         strategy_traits traits;
 
-        // NOTICE: Do not use _m_status as condition: evaling non-atomic type
-        // is not safe in non-mutexed statement even if qualified as volatile.
-        while (true)
+        while (!(_m_status & _st_terminate))
         {
             // Lock until to be able to get least one context.
             unique_lock<mutex> guard(_m_mtx);
@@ -312,8 +311,7 @@ private:
     typedef typename map_type<thread::id, thread>::type kernels_type;
     typedef typename strategy_traits::pool_type users_type;
 
-    // TODO: Use atomic type. (e.g. Boost.Atomic
-    volatile int       _m_status;
+    atomic<int>        _m_status;
     mutable mutex      _m_mtx;
     condition_variable _m_cond;
     kernels_type       _m_kernels;
