@@ -7,8 +7,8 @@ Introduction:
 > Boost.MMM is implementation of Many-to-Many thread Model.
 > This library is **not** part of Boost.
 
-Installation:
--------------
+Depends:
+--------
 
 > Boost.MMM depends on followings.
 >
