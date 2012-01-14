@@ -120,11 +120,17 @@ private:
                 current_context::set_current_ctx(0);
             }
 
-            // Notify one when context is not finished.
-            if (ctx_guard)
+            // Notify all even if context is finished to wakeup caller of join_all.
+            if (_m_status & _st_join)
             {
-                if (_m_status & _st_join) { _m_cond.notify_all(); }
-                else { _m_cond.notify_one(); }
+                // NOTICE: Because of using notify_all instead of notify_one,
+                // notify_one might wake up not caller of join_all.
+                _m_cond.notify_all();
+            }
+            // Notify one when context is not finished.
+            else if (ctx_guard)
+            {
+                _m_cond.notify_one();
             }
         }
     }
