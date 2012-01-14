@@ -30,4 +30,25 @@ __boost_mmm__ library is implementation of Many-to-Many thread Models.
 
 [endsect]
 
+[section:simple_launching Simple launching]
+
+[import ../example/simple_launching.cpp]
+[doc_simple_launching]
+
+[endsect]
+
+[section:strategy Context switching strategy]
+
+[section:strategy_fifo FIFO]
+[*FIFO] is most popular strategy for determining next execution context. FIFO is also called queue.
+
+[endsect]
+
+[endsect]
+
 [xinclude autodoc.xml]
+
+[section:todo TODO]
+*   non-blocking I/O interface: migrate to behind and polling them
+
+[endsect]
