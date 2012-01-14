@@ -1,0 +1,36 @@
+import doxygen ;
+import path ;
+import project ;
+import quickbook ;
+import sequence ;
+
+local current = [ project.current ] ;
+local location = [ $(current).get source-location ] ;
+doxygen autodoc
+  :
+      [ path.glob-tree $(location)/../../../boost/mmm : *.hpp : detail ]
+  :
+      <doxygen:param>EXTRACT_ALL=NO
+      <doxygen:param>HIDE_UNDOC_MEMBERS=YES
+      <doxygen:param>EXTRACT_PRIVATE=NO
+      <doxygen:param>ENABLE_PREPROCESSING=YES
+      <doxygen:param>EXPAND_ONLY_PREDEF=YES
+      <doxygen:param>MACRO_EXPANSION=YES
+      <doxygen:param>PREDEFINED="\"BOOST_MMM_DOXYGEN_INVOKED\" \\
+                                 \"BOOST_RV_REF(T)=T &&\""
+      <xsl:param>"boost.doxygen.reftitle=Boost.MMM Header Reference"
+  ;
+
+xml mmm : mmm.qbk ;
+
+boostbook standalone
+  :
+      mmm
+  :
+      <xsl:param>boost.root=../../../..
+      <xsl:param>boost.libraries=../../../../libs/libraries.htm
+      <xsl:param>generate.section.toc.level=3
+      <xsl:param>chunk.first.sections=1
+      <dependency>autodoc
+      #<format>pdf:<xsl:param>boost.url.prefix=http://www.boost.org/doc/libs/release/doc/html
+  ;

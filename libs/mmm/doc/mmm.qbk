@@ -1,0 +1,33 @@
+[/
+          Copyright Kohei Takahashi 2011 - 2012.
+ Distributed under the Boost Software License, Version 1.0.
+    (See accompanying file LICENSE_1_0.txt or copy at
+          http://www.boost.org/LICENSE_1_0.txt)
+]
+
+[library Boost.MMM
+    [quickbook 1.4]
+    [authors [Takahashi, Kohei]]
+    [copyright 2011-2012 Kohei Takahashi]
+    [id mmm]
+    [dirname mmm]
+    [purpose C++ library for Many-to-Many thread Model]
+    [license
+        Distributed under the Boost Software License, Version 1.0.
+        (See accompanying file LICENSE_1_0.txt or copy at
+        [@http://www.boost.org/LICENSE_1_0.txt])
+    ]
+]
+
+[def __boost_mmm__ [*Boost.MMM]]
+[def __boost_atomic__ [*Boost.Atomic]]
+[def __boost_context__ [*Boost.Context]]
+[def __boost_thread__ [*Boost.Thread]]
+
+[section:intro Introduction]
+
+__boost_mmm__ library is implementation of Many-to-Many thread Models.
+
+[endsect]
+
+[xinclude autodoc.xml]
