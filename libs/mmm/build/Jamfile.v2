@@ -3,8 +3,45 @@
 #    (See accompanying file LICENSE_1_0.txt or copy at
 #          http://www.boost.org/LICENSE_1_0.txt)
 
+local rule is_loaded ( id )
+{
+    import modules ;
+    import project ;
+    import sequence ;
+
+    for local attr in [ sequence.transform project.attributes
+                          : [ modules.peek project : .jamfile-modules ] ]
+    {
+        if $(id) = [ $(attr).get id ]
+        {
+            return true ;
+        }
+    }
+}
+
+local rule library ( id : lib )
+{
+    if [ is_loaded $(id) ]
+    {
+        return <library>$(id)//$(lib) ;
+    }
+    else
+    {
+        return
+          <link>shared:<find-shared-library>$(lib)
+          <link>static:<find-static-library>$(lib)
+          ;
+    }
+}
+
 project boost/mmm
   : source-location ../src
+  : requirements
+      [ library /boost/thread : boost_thread ]
+      [ library /boost/context : boost_context ]
+  : usage-requirements
+      [ library /boost/thread : boost_thread ]
+      [ library /boost/context : boost_context ]
   ;
 
 lib boost_mmm
