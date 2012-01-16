@@ -113,6 +113,7 @@ private:
 
             context_guard ctx_guard(scheduler_traits(*this), traits);
 
+            ++_m_runnings;
             {
                 using namespace detail;
                 unique_unlock<mutex> unguard(guard);
@@ -122,6 +123,7 @@ private:
                 ctx.resume();
                 current_context::set_current_ctx(0);
             }
+            --_m_runnings;
 
             // Notify all even if context is finished to wakeup caller of join_all.
             if (_m_status & _st_join)
@@ -183,7 +185,7 @@ public:
      */
     explicit
     scheduler(const size_type default_count)
-      : _m_status(_st_none)
+      : _m_status(_st_none), _m_runnings(0)
     {
         for (size_type cnt = 0; cnt < default_count; ++cnt)
         {
@@ -321,7 +323,7 @@ public:
         unique_lock<mutex> guard(_m_mtx);
 
         _m_status |= _st_join;
-        while (_m_users.size())
+        while (joinable_nolock())
         {
             _m_cond.wait(guard);
         }
@@ -337,10 +339,16 @@ public:
     joinable() const
     {
         unique_lock<mutex> guard(_m_mtx);
-        return _m_users.size() != 0;
+        return joinable_nolock();
     }
 
 private:
+    bool
+    joinable_nolock() const
+    {
+        return _m_users.size() != 0 || _m_runnings != 0;
+    }
+
 #if !defined(BOOST_MMM_DOXYGEN_INVOKED)
     template <typename Key, typename Elem>
     struct map_type
@@ -363,6 +371,7 @@ private:
     typedef typename strategy_traits::pool_type users_type;
 
     atomic<int>        _m_status;
+    unsigned           _m_runnings;
     mutable mutex      _m_mtx;
     condition_variable _m_cond;
     kernels_type       _m_kernels;
