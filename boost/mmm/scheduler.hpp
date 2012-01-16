@@ -322,9 +322,9 @@ public:
     {
         unique_lock<mutex> guard(_m_mtx);
 
-        _m_status |= _st_join;
         while (joinable_nolock())
         {
+            _m_status |= _st_join;
             _m_cond.wait(guard);
         }
         _m_status &= ~_st_join;
