@@ -343,13 +343,13 @@ public:
     }
 
 private:
+#if !defined(BOOST_MMM_DOXYGEN_INVOKED)
     bool
     joinable_nolock() const
     {
         return _m_users.size() != 0 || _m_runnings != 0;
     }
 
-#if !defined(BOOST_MMM_DOXYGEN_INVOKED)
     template <typename Key, typename Elem>
     struct map_type
     {
