@@ -62,6 +62,12 @@ namespace boost { namespace mmm {
 template <typename Strategy, typename Allocator = std::allocator<int> >
 class scheduler : private boost::noncopyable
 {
+public:
+    typedef Strategy strategy_type;
+    typedef Allocator allocator_type;
+    typedef std::size_t size_type;
+
+private:
     typedef scheduler this_type;
 
     friend class detail::context_guard<this_type>;
@@ -75,19 +81,15 @@ class scheduler : private boost::noncopyable
         _st_none = 0
     };
 
-public:
-    typedef Strategy strategy_type;
-    typedef Allocator allocator_type;
-    typedef std::size_t size_type;
+    typedef mmm::detail::context_guard<this_type> context_guard;
 
     typedef container::allocator_traits<allocator_type> allocator_traits;
-
     typedef mmm::scheduler_traits<this_type> scheduler_traits;
     typedef
       mmm::strategy_traits<strategy_type, contexts::context, allocator_type>
     strategy_traits;
 
-    typedef mmm::detail::context_guard<this_type> context_guard;
+public:
     typedef typename strategy_traits::context_type context_type;
 
 private:
@@ -220,7 +222,7 @@ public:
 #if defined(BOOST_NO_VARIADIC_TEMPLATES)
 #define BOOST_MMM_scheduler_add_thread(unused_z_, n_, unused_data_)         \
     template <typename Fn BOOST_PP_ENUM_TRAILING_PARAMS(n_, typename Arg)>  \
-    typename disable_if<is_same<std::size_t, Fn> >::type                    \
+    typename disable_if<is_same<size_type, Fn> >::type                      \
     add_thread(Fn fn BOOST_PP_ENUM_TRAILING_BINARY_PARAMS(n_, Arg, arg))    \
     {                                                                       \
         add_thread<Fn & BOOST_PP_ENUM_TRAILING_BINARY_PARAMS(n_, Arg, & BOOST_PP_INTERCEPT)>( \
@@ -230,7 +232,7 @@ public:
                                                                             \
     template <typename Fn BOOST_PP_ENUM_TRAILING_PARAMS(n_, typename Arg)>  \
     void                                                                    \
-    add_thread(std::size_t size, Fn fn BOOST_PP_ENUM_TRAILING_BINARY_PARAMS(n_, Arg, arg)) \
+    add_thread(size_type size, Fn fn BOOST_PP_ENUM_TRAILING_BINARY_PARAMS(n_, Arg, arg)) \
     {                                                                       \
         using contexts::no_stack_unwind;                                    \
         using contexts::return_to_caller;                                   \
@@ -250,7 +252,7 @@ public:
 #undef BOOST_MMM_scheduler_add_thread
 #else
     template <typename Fn, typename... Args>
-    typename disable_if<is_same<std::size_t, Fn> >::type
+    typename disable_if<is_same<size_type, Fn> >::type
     add_thread(Fn fn, Args... args)
     {
         using contexts::default_size;
@@ -259,7 +261,7 @@ public:
 
     template <typename Fn, typename... Args>
     void
-    add_thread(std::size_t size, Fn fn, Args... args)
+    add_thread(size_type size, Fn fn, Args... args)
     {
         using contexts::no_stack_unwind;
         using contexts::return_to_caller;

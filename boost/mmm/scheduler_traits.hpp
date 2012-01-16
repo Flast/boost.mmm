@@ -13,17 +13,19 @@ namespace boost { namespace mmm {
 template <typename Scheduler>
 struct scheduler_traits
 {
+    typedef Scheduler scheduler_type;
+
     explicit
-    scheduler_traits(Scheduler &sch)
+    scheduler_traits(scheduler_type &sch)
       : _m_scheduler(sch) {}
 
-    typename Scheduler::strategy_traits::pool_type &
+    typename scheduler_type::strategy_traits::pool_type &
     pool()
     {
         return _m_scheduler.get()._m_users;
     }
 
-    boost::reference_wrapper<Scheduler> _m_scheduler;
+    boost::reference_wrapper<scheduler_type> _m_scheduler;
 }; // template class scheduler_traits
 
 } } // namespace boost::mmm
