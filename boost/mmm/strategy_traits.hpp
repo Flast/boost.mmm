@@ -9,9 +9,11 @@
 namespace boost { namespace mmm {
 
 template <typename Strategy, typename Context, typename Allocator>
-struct strategy_traits {}; // template class strategy_traits
+struct strategy_traits {}; // template struct strategy_traits
 
+#if !defined(BOOST_MMM_DOXYGEN_INVOKED)
 namespace strategy {} // namespace boost::mmm::strategy
+#endif
 
 } } // namespace boost::mmm
 

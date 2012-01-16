@@ -19,14 +19,18 @@ struct scheduler_traits
     scheduler_traits(scheduler_type &sch)
       : _m_scheduler(sch) {}
 
+    /**
+     * <b>Returns</b>: Context pool.
+     */
     typename scheduler_type::strategy_traits::pool_type &
     pool()
     {
         return _m_scheduler.get()._m_users;
     }
 
+private:
     boost::reference_wrapper<scheduler_type> _m_scheduler;
-}; // template class scheduler_traits
+}; // template struct scheduler_traits
 
 } } // namespace boost::mmm
 

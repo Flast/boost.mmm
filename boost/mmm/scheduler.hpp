@@ -79,7 +79,7 @@ private:
         _st_join      = 1 << 1,
 
         _st_none = 0
-    };
+    }; // enum scheduler_status
 
     typedef mmm::detail::context_guard<this_type> context_guard;
 
@@ -93,6 +93,7 @@ public:
     typedef typename strategy_traits::context_type context_type;
 
 private:
+#if !defined(BOOST_MMM_DOXYGEN_INVOKED)
     void
     _m_exec()
     {
@@ -174,13 +175,17 @@ private:
         current_context::set_current_ctx(0);
         return vp;
     }
+#endif
 
 public:
+    /**
+     * <b>Effects</b>: Construct with specified count <i>kernel threads</i>.
+     */
     explicit
-    scheduler(size_type default_size)
+    scheduler(const size_type default_count)
       : _m_status(_st_none)
     {
-        while (default_size--)
+        for (size_type cnt = 0; cnt < default_count; ++cnt)
         {
             thread th(&scheduler::_m_exec, ref(*this));
 
@@ -194,10 +199,19 @@ public:
             BOOST_MMM_DETAIL_UNUSED(r);
 #endif
         }
+#if defined(BOOST_MMM_CONTAINER_BREAKING_EMPLACE_RETURN_TYPE)
+        BOOST_ASSERT(_m_kernels.size() == default_count);
+#endif
     }
 
-    // Call std::terminate: works similar to std::thread::~thread.
-    // Users should join all user thread before destruct.
+    /**
+     * <b>Precondition</b>: !joinable()
+     *
+     * <b>Effects</b>: Join all <i>kernel threads</i>. Call std::terminate immediately
+     * iff joinable. Users should join all <i>user threads</i> before destruct.
+     *
+     * <b>Throws</b>: Nothing.
+     */
     ~scheduler()
     {
         if (joinable()) { std::terminate(); }
@@ -219,7 +233,7 @@ public:
     }
 
     // To prevent unnecessary coping, explicit instantiation with lvalue reference.
-#if defined(BOOST_NO_VARIADIC_TEMPLATES)
+#if !defined(BOOST_MMM_DOXYGEN_INVOKED) && defined(BOOST_NO_VARIADIC_TEMPLATES)
 #define BOOST_MMM_scheduler_add_thread(unused_z_, n_, unused_data_)         \
     template <typename Fn BOOST_PP_ENUM_TRAILING_PARAMS(n_, typename Arg)>  \
     typename disable_if<is_same<size_type, Fn> >::type                      \
@@ -251,14 +265,30 @@ public:
     BOOST_PP_REPEAT(BOOST_PP_INC(BOOST_CONTEXT_ARITY), BOOST_MMM_scheduler_add_thread, ~)
 #undef BOOST_MMM_scheduler_add_thread
 #else
+    /**
+     * <b>Effects</b>: Construct context and join to scheduling with default
+     * stack size.
+     *
+     * <b>Requires</b>: All of functor and arguments are <b>CopyConstructible</b>.
+     */
     template <typename Fn, typename... Args>
+#if !defined(BOOST_MMM_DOXYGEN_INVOKED)
     typename disable_if<is_same<size_type, Fn> >::type
+#else
+    void
+#endif
     add_thread(Fn fn, Args... args)
     {
         using contexts::default_size;
         add_thread<Fn &, Args &...>(default_size(), fn, args...);
     }
 
+    /**
+     * <b>Effects</b>: Construct context and join to scheduling with specified
+     * stack size.
+     *
+     * <b>Requires</b>: All of functor and arguments are <b>CopyConstructible</b>.
+     */
     template <typename Fn, typename... Args>
     void
     add_thread(size_type size, Fn fn, Args... args)
@@ -278,7 +308,13 @@ public:
     }
 #endif
 
-    // Join all user threads.
+    /**
+     * <b>Effects</b>: Join all <i>user threads</i>.
+     *
+     * <b>Postcondition</b>: !joinable()
+     *
+     * <b>Throws</b>: Nothing.
+     */
     void
     join_all()
     {
@@ -292,6 +328,11 @@ public:
         _m_status &= ~_st_join;
     }
 
+    /**
+     * <b>Returns</b>: true iff any contexts are still not completed. Otherwise false.
+     *
+     * <b>Throws</b>: Nothing.
+     */
     bool
     joinable() const
     {
@@ -300,6 +341,7 @@ public:
     }
 
 private:
+#if !defined(BOOST_MMM_DOXYGEN_INVOKED)
     template <typename Key, typename Elem>
     struct map_type
     {
@@ -314,7 +356,8 @@ private:
           container::map<Key, Elem, std::less<Key>, _alloc_type>
 #endif
         type;
-    }; // template class map_type
+    }; // template struct map_type
+#endif
 
     typedef typename map_type<thread::id, thread>::type kernels_type;
     typedef typename strategy_traits::pool_type users_type;

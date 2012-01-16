@@ -31,12 +31,20 @@ struct strategy_traits<strategy::fifo, Context, Allocator>
 {
     typedef Context context_type;
 
+#if !defined(BOOST_MMM_DOXYGEN_INVOKED)
     typedef container::allocator_traits<Allocator> _allocator_traits;
     typedef typename _allocator_traits::template rebind_alloc<context_type> _allocator_type;
+#endif
 
     typedef container::list<context_type, _allocator_type> pool_type;
 
-    // Pre-condition: pool.size() > 0 .
+    /**
+     * <b>Precondition</b>: traits.pool().size() > 0
+     *
+     * <b>Effects</b>: Pop a context from context pool.
+     *
+     * <b>Returns</b>: A context which is not a <i>not-a-context</i>.
+     */
     template <typename SchedulerTraits>
     context_type
     pop_ctx(SchedulerTraits traits)
@@ -51,7 +59,11 @@ struct strategy_traits<strategy::fifo, Context, Allocator>
         return move(ctx);
     }
 
-    // Pre-condition: Context is not a /not-a-context/ and not completed.
+    /**
+     * <b>Precondition</b>: ctx is not a <i>not-a-context</i>, !ctx.is_completed()
+     *
+     * <b>Effects</b>: Push a specified context to context pool.
+     */
     template <typename SchedulerTraits>
     void
     push_ctx(SchedulerTraits traits, context_type ctx)
@@ -62,7 +74,7 @@ struct strategy_traits<strategy::fifo, Context, Allocator>
         // Call boost::move via ADL
         pool.push_back(move(ctx));
     }
-}; // template class strategy_traits<strategy::fifo>
+}; // template struct strategy_traits<strategy::fifo, C, A>
 
 } } // namespace boost::mmm
 
