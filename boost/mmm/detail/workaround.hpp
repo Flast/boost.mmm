@@ -7,6 +7,7 @@
 #define BOOST_MMM_DETAIL_WORKAROUND_HPP
 
 #include <boost/version.hpp>
+#include <boost/thread/detail/config.hpp>
 
 // see #6272 in svn.boost.org
 //#define BOOST_MMM_THREAD_SUPPORTS_HASHABLE_THREAD_ID
@@ -18,7 +19,9 @@
 
 // Currently(after Boost 1.48.0), Boost has Move Semantics emulator library: Boost.Move.
 // But Boost.Thread implements Move Semantics with original implementations.
-//#define BOOST_MMM_THREAD_SUPPORTS_MOVE_BASED_MOVE
+#if defined(BOOST_THREAD_USES_MOVE)
+#   define BOOST_MMM_THREAD_SUPPORTS_MOVE_BASED_MOVE
+#endif
 
 #endif
 
