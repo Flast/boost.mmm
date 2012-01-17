@@ -281,8 +281,8 @@ public:
 #endif
     add_thread(Fn fn, Args... args)
     {
-        using contexts::default_size;
-        add_thread<Fn &, Args &...>(default_size(), fn, args...);
+        using contexts::default_stacksize;
+        add_thread<Fn &, Args &...>(default_stacksize(), fn, args...);
     }
 
     /**
