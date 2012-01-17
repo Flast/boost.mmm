@@ -60,7 +60,7 @@
 namespace boost { namespace mmm {
 
 template <typename Strategy, typename Allocator = std::allocator<int> >
-class scheduler : private boost::noncopyable
+class scheduler : private noncopyable
 {
 public:
     typedef Strategy strategy_type;
@@ -189,7 +189,7 @@ public:
     {
         for (size_type cnt = 0; cnt < default_count; ++cnt)
         {
-            thread th(&scheduler::_m_exec, ref(*this));
+            thread th(&scheduler::_m_exec, boost::ref(*this));
 
 #if !defined(BOOST_MMM_CONTAINER_BREAKING_EMPLACE_RETURN_TYPE)
             std::pair<typename kernels_type::iterator, bool> r =
