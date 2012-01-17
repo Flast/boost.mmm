@@ -6,6 +6,7 @@
 #ifndef BOOST_MMM_DETAIL_MOVABLE_THREAD_HPP
 #define BOOST_MMM_DETAIL_MOVABLE_THREAD_HPP
 
+#include <boost/config.hpp>
 #include <boost/mmm/detail/workaround.hpp>
 
 #include <boost/preprocessor/repetition/repeat.hpp>
@@ -37,7 +38,9 @@ class BOOST_THREAD_DECL thread : public boost::thread
     typedef boost::thread _base_t;
 
     // Ignoring original impls
+#if defined(BOOST_NO_RVALUE_REFERENCES)
     using _base_t::operator boost::detail::thread_move_t<boost::thread>;
+#endif
     using _base_t::move;
 
 public:
