@@ -346,7 +346,8 @@ public:
     }
 
     /**
-     * <b>Returns</b>: true iff any contexts are still not completed. Otherwise false.
+     * <b>Returns</b>: true iff any contexts are still not completed. Otherwise
+     * false.
      *
      * <b>Throws</b>: Nothing.
      */
@@ -355,6 +356,30 @@ public:
     {
         unique_lock<mutex> guard(_m_mtx);
         return joinable_nolock();
+    }
+
+    /**
+     * <b>Returns</b>: Number of <i>kernel threads</i>.
+     *
+     * <b>Throws</b>: Nothing.
+     */
+    size_type
+    kernel_size() const
+    {
+        unique_lock<mutex> guard(_m_mtx);
+        return _m_kernels.size();
+    }
+
+    /**
+     * <b>Returns</b>: Number of <i>user threads</i>.
+     *
+     * <b>Throws</b>: Nothing.
+     */
+    size_type
+    user_size() const
+    {
+        unique_lock<mutex> guard(_m_mtx);
+        return _m_users.size();
     }
 
 private:
