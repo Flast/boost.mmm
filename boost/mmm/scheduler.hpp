@@ -44,7 +44,9 @@
 #include <boost/thread/locks.hpp>
 #include <boost/mmm/detail/locks.hpp>
 
+#if !defined(BOOST_MMM_CONTAINER_HAS_NO_ALLOCATOR_TRAITS)
 #include <boost/container/allocator/allocator_traits.hpp>
+#endif
 #if defined(BOOST_MMM_THREAD_SUPPORTS_HASHABLE_THREAD_ID)
 #include <boost/unordered_map.hpp>
 #include <boost/functional/hash.hpp>
@@ -83,7 +85,9 @@ private:
 
     typedef mmm::detail::context_guard<this_type> context_guard;
 
+#if !defined(BOOST_MMM_CONTAINER_HAS_NO_ALLOCATOR_TRAITS)
     typedef container::allocator_traits<allocator_type> allocator_traits;
+#endif
     typedef mmm::scheduler_traits<this_type> scheduler_traits;
     typedef
       mmm::strategy_traits<strategy_type, contexts::context, allocator_type>
@@ -354,7 +358,11 @@ private:
     struct map_type
     {
         typedef
+#if !defined(BOOST_MMM_CONTAINER_HAS_NO_ALLOCATOR_TRAITS)
           typename allocator_traits::template rebind_alloc<std::pair<const Key, Elem> >
+#else
+          typename allocator_type::template rebind<std::pair<const Key, Elem> >::other
+#endif
         _alloc_type;
 
         typedef

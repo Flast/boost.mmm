@@ -13,7 +13,9 @@
 #include <boost/assert.hpp>
 
 #include <boost/intrusive/detail/mpl.hpp>
+#if !defined(BOOST_MMM_CONTAINER_HAS_NO_ALLOCATOR_TRAITS)
 #include <boost/container/allocator/allocator_traits.hpp>
+#endif
 #include <boost/container/list.hpp>
 
 #include <boost/mmm/strategy_traits.hpp>
@@ -32,8 +34,17 @@ struct strategy_traits<strategy::fifo, Context, Allocator>
     typedef Context context_type;
 
 #if !defined(BOOST_MMM_DOXYGEN_INVOKED)
+#   if !defined(BOOST_MMM_CONTAINER_HAS_NO_ALLOCATOR_TRAITS)
     typedef container::allocator_traits<Allocator> _allocator_traits;
-    typedef typename _allocator_traits::template rebind_alloc<context_type> _allocator_type;
+#   endif
+
+    typedef
+#   if !defined(BOOST_MMM_CONTAINER_HAS_NO_ALLOCATOR_TRAITS)
+      typename _allocator_traits::template rebind_alloc<context_type>
+#   else
+      typename Allocator::template rebind<context_type>::other
+#   endif
+    _allocator_type;
 #endif
 
     typedef container::list<context_type, _allocator_type> pool_type;

@@ -9,12 +9,21 @@
 #include <boost/version.hpp>
 #include <boost/thread/detail/config.hpp>
 
+#if BOOST_VERSION < 104800
+#   error Boost.MMM requires Boost 1.48.0 or later
+#endif
+
 // see #6272 in svn.boost.org
 //#define BOOST_MMM_THREAD_SUPPORTS_HASHABLE_THREAD_ID
 
-// see #6336 in svn.boost.org
 #if BOOST_VERSION < 104900
+
+// see #6336 in svn.boost.org
 #   define BOOST_MMM_CONTAINER_BREAKING_EMPLACE_RETURN_TYPE
+
+// In 1.48.0, Boost.Container has no allocator traits.
+#   define BOOST_MMM_CONTAINER_HAS_NO_ALLOCATOR_TRAITS
+
 #endif
 
 // Currently(after Boost 1.48.0), Boost has Move Semantics emulator library: Boost.Move.
