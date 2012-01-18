@@ -6,6 +6,9 @@
 #ifndef BOOST_MMM_SCHEDULER_TRAITS_HPP
 #define BOOST_MMM_SCHEDULER_TRAITS_HPP
 
+#include <boost/config.hpp>
+#include <boost/detail/workaround.hpp>
+
 #include <boost/ref.hpp>
 
 namespace boost { namespace mmm {
@@ -23,7 +26,7 @@ struct scheduler_traits
      * <b>Returns</b>: Context pool.
      */
     typename scheduler_type::strategy_traits::pool_type &
-    pool()
+    pool() const BOOST_NOEXCEPT
     {
         return _m_scheduler.get()._m_users;
     }

@@ -6,6 +6,7 @@
 #ifndef BOOST_MMM_DETAIL_CONTEXT_GUARD_HPP
 #define BOOST_MMM_DETAIL_CONTEXT_GUARD_HPP
 
+#include <boost/config.hpp>
 #include <boost/mmm/detail/workaround.hpp>
 
 #include <boost/config.hpp>
@@ -47,19 +48,19 @@ public:
     }
 
     context_type &
-    context() { return _m_ctx; }
+    context() BOOST_NOEXCEPT { return _m_ctx; }
 
     const context_type &
-    context() const { return _m_ctx; }
+    context() BOOST_NOEXCEPT const { return _m_ctx; }
 
 #if defined(BOOST_NO_EXPLICIT_CONVERSION_OPERATORS)
-    operator unspecified_bool_type() const
+    operator unspecified_bool_type() const BOOST_NOEXCEPT
     {
         return is_suspended() ? &context_guard::true_type : 0;
     }
 #else
     explicit
-    operator bool() const
+    operator bool() const BOOST_NOEXCEPT
     {
         return is_suspended();
     }
@@ -67,7 +68,7 @@ public:
 
 private:
     bool
-    is_suspended() const
+    is_suspended() const BOOST_NOEXCEPT
     {
         return context() && !context().is_complete();
     }

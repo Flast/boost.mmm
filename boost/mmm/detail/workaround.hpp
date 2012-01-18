@@ -7,10 +7,15 @@
 #define BOOST_MMM_DETAIL_WORKAROUND_HPP
 
 #include <boost/version.hpp>
+#include <boost/config.hpp>
 #include <boost/thread/detail/config.hpp>
 
 #if BOOST_VERSION < 104800
 #   error Boost.MMM requires Boost 1.48.0 or later
+#endif
+
+#if !defined(BOOST_NOEXCEPT)
+#   define BOOST_NOEXCEPT
 #endif
 
 // see #6272 in svn.boost.org

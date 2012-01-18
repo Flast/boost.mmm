@@ -333,7 +333,7 @@ public:
      * <b>Throws</b>: Nothing.
      */
     void
-    join_all()
+    join_all() BOOST_NOEXCEPT
     {
         unique_lock<mutex> guard(_m_mtx);
 
@@ -352,7 +352,7 @@ public:
      * <b>Throws</b>: Nothing.
      */
     bool
-    joinable() const
+    joinable() const BOOST_NOEXCEPT
     {
         unique_lock<mutex> guard(_m_mtx);
         return joinable_nolock();
@@ -364,7 +364,7 @@ public:
      * <b>Throws</b>: Nothing.
      */
     size_type
-    kernel_size() const
+    kernel_size() const BOOST_NOEXCEPT
     {
         unique_lock<mutex> guard(_m_mtx);
         return _m_kernels.size();
@@ -376,7 +376,7 @@ public:
      * <b>Throws</b>: Nothing.
      */
     size_type
-    user_size() const
+    user_size() const BOOST_NOEXCEPT
     {
         unique_lock<mutex> guard(_m_mtx);
         return _m_users.size();
@@ -385,7 +385,7 @@ public:
 private:
 #if !defined(BOOST_MMM_DOXYGEN_INVOKED)
     bool
-    joinable_nolock() const
+    joinable_nolock() const BOOST_NOEXCEPT
     {
         return _m_users.size() != 0 || _m_runnings != 0;
     }
