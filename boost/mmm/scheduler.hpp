@@ -11,6 +11,7 @@
 #include <memory>
 #include <functional>
 #include <exception>
+#include <stdexcept>
 
 #include <boost/config.hpp>
 #include <boost/mmm/detail/workaround.hpp>
@@ -22,6 +23,7 @@
 #include <boost/ref.hpp>
 #include <boost/noncopyable.hpp>
 #include <boost/lambda/bind.hpp>
+#include <boost/throw_exception.hpp>
 
 #if defined(BOOST_NO_VARIADIC_TEMPLATES)
 #include <boost/preprocessor/arithmetic/inc.hpp>
@@ -186,12 +188,21 @@ private:
 public:
     /**
      * <b>Effects</b>: Construct with specified count <i>kernel threads</i>.
+     *
+     * <b>Throws</b>: std::invalid_argument (wrapped by Boost.Exception):
+     * if default_count <= 0 .
      */
     explicit
-    scheduler(const size_type default_count)
+    scheduler(const int default_count)
       : _m_status(_st_none), _m_runnings(0)
     {
-        for (size_type cnt = 0; cnt < default_count; ++cnt)
+        if (!(0 < default_count))
+        {
+            using std::invalid_argument;
+            BOOST_THROW_EXCEPTION(invalid_argument("default_count should be > 0"));
+        }
+
+        for (int cnt = 0; cnt < default_count; ++cnt)
         {
             thread th(&scheduler::_m_exec, boost::ref(*this));
 
