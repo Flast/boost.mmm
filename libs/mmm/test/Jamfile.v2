@@ -1,3 +1,8 @@
+project
+  : requirements
+      <library>/boost/mmm//boost_mmm
+  ;
+
 local rule test-each ( test : srcs * )
 {
     local tests = ;
