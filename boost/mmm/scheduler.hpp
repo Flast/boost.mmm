@@ -61,7 +61,7 @@
 
 namespace boost { namespace mmm {
 
-template <typename Strategy, typename Allocator = std::allocator<int> >
+template <typename Strategy, typename Allocator = std::allocator<void> >
 class scheduler : private noncopyable
 {
 public:
