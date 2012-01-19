@@ -227,7 +227,7 @@ private:
         return context_starter<F>(f, ctx);
     }
 
-    void *
+    static void *
     start_context(context_type &ctx)
     {
         using namespace detail;
@@ -255,7 +255,7 @@ public:
      * <b>Throws</b>: std::invalid_argument (wrapped by Boost.Exception):
      * if default_count <= 0 .
      *
-     * <b>Postcondition</b>: *this is <i>in-scheduling</i>.
+     * <b>Postcondition</b>: *this is not <i>not-in-scheduling</i>.
      */
     explicit
     scheduler(const int default_count)
@@ -355,7 +355,7 @@ public:
 #undef BOOST_MMM_scheduler_add_thread
 #else
     /**
-     * <b>Precondition</b>: *this is <i>in-scheduling</i>.
+     * <b>Precondition</b>: *this is not <i>not-in-scheduling</i>.
      *
      * <b>Effects</b>: Construct context and join to scheduling with default
      * stack size.
@@ -376,7 +376,7 @@ public:
     }
 
     /**
-     * <b>Precondition</b>: *this is <i>in-scheduling</i>.
+     * <b>Precondition</b>: *this is not <i>not-in-scheduling</i>.
      *
      * <b>Effects</b>: Construct context and join to scheduling with specified
      * stack size.
@@ -413,7 +413,7 @@ private:
 #endif
 public:
     /**
-     * <b>Precondition</b>: *this is <i>in-scheduling</i>.
+     * <b>Precondition</b>: *this is not <i>not-in-scheduling</i>.
      *
      * <b>Effects</b>: Join all <i>user-threads</i>.
      *
@@ -436,7 +436,7 @@ public:
     }
 
     /**
-     * <b>Precondition</b>: *this is <i>in-scheduling</i>.
+     * <b>Precondition</b>: *this is not <i>not-in-scheduling</i>.
      *
      * <b>Returns</b>: true iff any contexts are still not completed. Otherwise
      * false.
@@ -452,7 +452,7 @@ public:
     }
 
     /**
-     * <b>Precondition</b>: *this is <i>in-scheduling</i>.
+     * <b>Precondition</b>: *this is not <i>not-in-scheduling</i>.
      *
      * <b>Returns</b>: Number of <i>kernel-threads</i>.
      *
@@ -467,7 +467,7 @@ public:
     }
 
     /**
-     * <b>Precondition</b>: *this is <i>in-scheduling</i>.
+     * <b>Precondition</b>: *this is not <i>not-in-scheduling</i>.
      *
      * <b>Returns</b>: Number of <i>user-threads</i>.
      *

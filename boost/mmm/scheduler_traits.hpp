@@ -24,7 +24,7 @@ struct scheduler_traits
       : _m_scheduler(sch) {}
 
     /**
-     * <b>Precondition</b>: scheduler is <i>in-scheduling</i>.
+     * <b>Precondition</b>: scheduler is not <i>not-in-scheduling</i>.
      *
      * <b>Returns</b>: Context pool.
      */
