@@ -22,6 +22,7 @@
 #endif
 #include <boost/ref.hpp>
 #include <boost/noncopyable.hpp>
+#include <boost/move/move.hpp>
 #include <boost/lambda/bind.hpp>
 #include <boost/throw_exception.hpp>
 
@@ -46,6 +47,8 @@
 #include <boost/thread/locks.hpp>
 #include <boost/mmm/detail/locks.hpp>
 
+#include <boost/checked_delete.hpp>
+#include <boost/interprocess/smart_ptr/unique_ptr.hpp>
 #if !defined(BOOST_MMM_CONTAINER_HAS_NO_ALLOCATOR_TRAITS)
 #include <boost/container/allocator/allocator_traits.hpp>
 #endif
@@ -63,9 +66,58 @@
 
 namespace boost { namespace mmm {
 
-template <typename Strategy, typename Allocator = std::allocator<void> >
-class scheduler : private noncopyable
+namespace detail {
+
+template <typename StrategyTraits, typename Allocator>
+struct scheduler_data : private noncopyable
 {
+#if !defined(BOOST_MMM_CONTAINER_HAS_NO_ALLOCATOR_TRAITS)
+    typedef container::allocator_traits<Allocator> allocator_traits;
+#endif
+
+    template <typename Key, typename Elem>
+    struct map_type
+    {
+        typedef std::pair<const Key, Elem> value_type;
+        typedef
+#if !defined(BOOST_MMM_CONTAINER_HAS_NO_ALLOCATOR_TRAITS)
+          typename allocator_traits::template rebind_alloc<value_type>
+#else
+          typename Allocator::template rebind<value_type>::other
+#endif
+        alloc_type;
+
+        typedef
+#if defined(BOOST_MMM_THREAD_SUPPORTS_HASHABLE_THREAD_ID)
+          unordered_map<Key, Elem, hash<Key>, std::equal_to<Key>, alloc_type>
+#else
+          container::map<Key, Elem, std::less<Key>, alloc_type>
+#endif
+        type;
+    }; // template struct map_type
+
+    typedef typename map_type<thread::id, thread>::type kernels_type;
+    typedef typename StrategyTraits::pool_type users_type;
+
+    atomic<int>        status;
+    unsigned           runnings;
+    mutex              mtx;
+    condition_variable cond;
+    kernels_type       kernels;
+    users_type         users;
+
+    explicit
+    scheduler_data()
+      : status(0), runnings(0) {}
+};
+
+} // namespace boost::mmm::detail
+
+template <typename Strategy, typename Allocator = std::allocator<void> >
+class scheduler
+{
+    BOOST_MOVABLE_BUT_NOT_COPYABLE(scheduler)
+
 public:
     typedef Strategy strategy_type;
     typedef Allocator allocator_type;
@@ -95,31 +147,35 @@ private:
       mmm::strategy_traits<strategy_type, contexts::context, allocator_type>
     strategy_traits;
 
+    typedef detail::scheduler_data<strategy_traits, allocator_type> scheduler_data;
+    typedef typename scheduler_data::kernels_type kernels_type;
+    typedef typename scheduler_data::users_type users_type;
+
 public:
     typedef typename strategy_traits::context_type context_type;
 
 private:
 #if !defined(BOOST_MMM_DOXYGEN_INVOKED)
     void
-    _m_exec()
+    _m_exec(scheduler_data &data)
     {
         strategy_traits traits;
 
-        while (!(_m_status & _st_terminate))
+        while (!(data.status & _st_terminate))
         {
             // Lock until to be able to get least one context.
-            unique_lock<mutex> guard(_m_mtx);
+            unique_lock<mutex> guard(data.mtx);
             // Check and breaking loop when destructing scheduler.
-            while (!(_m_status & _st_terminate) && !_m_users.size())
+            while (!(data.status & _st_terminate) && !data.users.size())
             {
                 // TODO: Check interrupts.
-                _m_cond.wait(guard);
+                data.cond.wait(guard);
             }
-            if (_m_status & _st_terminate) { break; }
+            if (data.status & _st_terminate) { break; }
 
             context_guard ctx_guard(scheduler_traits(*this), traits);
 
-            ++_m_runnings;
+            ++data.runnings;
             {
                 using namespace detail;
                 unique_unlock<mutex> unguard(guard);
@@ -129,19 +185,19 @@ private:
                 ctx.resume();
                 current_context::set_current_ctx(0);
             }
-            --_m_runnings;
+            --data.runnings;
 
             // Notify all even if context is finished to wakeup caller of join_all.
-            if (_m_status & _st_join)
+            if (data.status & _st_join)
             {
                 // NOTICE: Because of using notify_all instead of notify_one,
                 // notify_one might wake up not caller of join_all.
-                _m_cond.notify_all();
+                data.cond.notify_all();
             }
             // Notify one when context is not finished.
             else if (ctx_guard)
             {
-                _m_cond.notify_one();
+                data.cond.notify_one();
             }
         }
     }
@@ -187,6 +243,14 @@ private:
 
 public:
     /**
+     * <b>Effects</b>: Move internal scheduler datas from other.
+     *
+     * <b>Throws</b>: Nothing.
+     */
+    scheduler(BOOST_RV_REF(scheduler) other)
+      : _m_data(move(other._m_data)) {}
+
+    /**
      * <b>Effects</b>: Construct with specified count <i>kernel threads</i>.
      *
      * <b>Throws</b>: std::invalid_argument (wrapped by Boost.Exception):
@@ -194,7 +258,6 @@ public:
      */
     explicit
     scheduler(const int default_count)
-      : _m_status(_st_none), _m_runnings(0)
     {
         if (!(0 < default_count))
         {
@@ -202,22 +265,28 @@ public:
             BOOST_THROW_EXCEPTION(invalid_argument("default_count should be > 0"));
         }
 
+        // XXX: Should use specified allocator.
+        // Defer initializing.
+        _m_data.reset(new scheduler_data);
+        BOOST_ASSERT(_m_data);
+
         for (int cnt = 0; cnt < default_count; ++cnt)
         {
-            thread th(&scheduler::_m_exec, boost::ref(*this));
+            using boost::ref;
+            thread th(&scheduler::_m_exec, ref(*this), ref(*_m_data));
 
 #if !defined(BOOST_MMM_CONTAINER_BREAKING_EMPLACE_RETURN_TYPE)
             std::pair<typename kernels_type::iterator, bool> r =
 #endif
             // Call Boost.Move's boost::move via ADL
-            _m_kernels.emplace(th.get_id(), move(th));
+            _m_data->kernels.emplace(th.get_id(), move(th));
 #if !defined(BOOST_MMM_CONTAINER_BREAKING_EMPLACE_RETURN_TYPE)
             BOOST_ASSERT(r.second);
             BOOST_MMM_DETAIL_UNUSED(r);
 #endif
         }
 #if defined(BOOST_MMM_CONTAINER_BREAKING_EMPLACE_RETURN_TYPE)
-        BOOST_ASSERT(_m_kernels.size() == default_count);
+        BOOST_ASSERT(_m_data->kernels.size() == default_count);
 #endif
     }
 
@@ -231,19 +300,21 @@ public:
      */
     ~scheduler()
     {
+        if (!_m_data) { return; }
+
         if (joinable()) { std::terminate(); }
 
         {
-            unique_lock<mutex> guard(_m_mtx);
-            _m_status |= _st_terminate;
-            _m_cond.notify_all();
+            unique_lock<mutex> guard(_m_data->mtx);
+            _m_data->status |= _st_terminate;
+            _m_data->cond.notify_all();
         }
 
         typedef typename kernels_type::iterator iterator;
         typedef typename kernels_type::const_iterator const_iterator;
 
-        const_iterator end = _m_kernels.end();
-        for (iterator itr = _m_kernels.begin(); itr != end; ++itr)
+        const_iterator end = _m_data->kernels.end();
+        for (iterator itr = _m_data->kernels.begin(); itr != end; ++itr)
         {
             itr->second.join();
         }
@@ -274,9 +345,9 @@ public:
         , size, no_stack_unwind, return_to_caller).swap(ctx);               \
         start_context(ctx);                                                 \
                                                                             \
-        unique_lock<mutex> guard(_m_mtx);                                   \
+        unique_lock<mutex> guard(_m_data->mtx);                             \
         strategy_traits().push_ctx(scheduler_traits(*this), move(ctx));     \
-        _m_cond.notify_one();                                               \
+        _m_data->cond.notify_one();                                         \
     }                                                                       \
 // BOOST_MMM_scheduler_add_thread
     BOOST_PP_REPEAT(BOOST_PP_INC(BOOST_CONTEXT_ARITY), BOOST_MMM_scheduler_add_thread, ~)
@@ -319,12 +390,21 @@ public:
         , size, no_stack_unwind, return_to_caller).swap(ctx);
         start_context(ctx);
 
-        unique_lock<mutex> guard(_m_mtx);
+        unique_lock<mutex> guard(_m_data->mtx);
         strategy_traits().push_ctx(scheduler_traits(*this), move(ctx));
-        _m_cond.notify_one();
+        _m_data->cond.notify_one();
     }
 #endif
 
+private:
+#if !defined(BOOST_MMM_DOXYGEN_INVOKED)
+    bool
+    joinable_nolock() const BOOST_NOEXCEPT
+    {
+        return _m_data->users.size() != 0 || _m_data->runnings != 0;
+    }
+#endif
+public:
     /**
      * <b>Effects</b>: Join all <i>user threads</i>.
      *
@@ -335,14 +415,14 @@ public:
     void
     join_all() BOOST_NOEXCEPT
     {
-        unique_lock<mutex> guard(_m_mtx);
+        unique_lock<mutex> guard(_m_data->mtx);
 
         while (joinable_nolock())
         {
-            _m_status |= _st_join;
-            _m_cond.wait(guard);
+            _m_data->status |= _st_join;
+            _m_data->cond.wait(guard);
         }
-        _m_status &= ~_st_join;
+        _m_data->status &= ~_st_join;
     }
 
     /**
@@ -354,7 +434,7 @@ public:
     bool
     joinable() const BOOST_NOEXCEPT
     {
-        unique_lock<mutex> guard(_m_mtx);
+        unique_lock<mutex> guard(_m_data->mtx);
         return joinable_nolock();
     }
 
@@ -366,8 +446,8 @@ public:
     size_type
     kernel_size() const BOOST_NOEXCEPT
     {
-        unique_lock<mutex> guard(_m_mtx);
-        return _m_kernels.size();
+        unique_lock<mutex> guard(_m_data->mtx);
+        return _m_data->kernels.size();
     }
 
     /**
@@ -378,48 +458,17 @@ public:
     size_type
     user_size() const BOOST_NOEXCEPT
     {
-        unique_lock<mutex> guard(_m_mtx);
-        return _m_users.size();
+        unique_lock<mutex> guard(_m_data->mtx);
+        return _m_data->users.size();
     }
 
 private:
-#if !defined(BOOST_MMM_DOXYGEN_INVOKED)
-    bool
-    joinable_nolock() const BOOST_NOEXCEPT
-    {
-        return _m_users.size() != 0 || _m_runnings != 0;
-    }
+    // XXX: Should use specified allocator.
+    typedef
+      interprocess::unique_ptr<scheduler_data, checked_deleter<scheduler_data> >
+    scheduler_data_ptr;
 
-    template <typename Key, typename Elem>
-    struct map_type
-    {
-        typedef
-#if !defined(BOOST_MMM_CONTAINER_HAS_NO_ALLOCATOR_TRAITS)
-          typename allocator_traits::template rebind_alloc<std::pair<const Key, Elem> >
-#else
-          typename allocator_type::template rebind<std::pair<const Key, Elem> >::other
-#endif
-        _alloc_type;
-
-        typedef
-#if defined(BOOST_MMM_THREAD_SUPPORTS_HASHABLE_THREAD_ID)
-          unordered_map<Key, Elem, hash<Key>, std::equal_to<Key>, _alloc_type>
-#else
-          container::map<Key, Elem, std::less<Key>, _alloc_type>
-#endif
-        type;
-    }; // template struct map_type
-#endif
-
-    typedef typename map_type<thread::id, thread>::type kernels_type;
-    typedef typename strategy_traits::pool_type users_type;
-
-    atomic<int>        _m_status;
-    unsigned           _m_runnings;
-    mutable mutex      _m_mtx;
-    condition_variable _m_cond;
-    kernels_type       _m_kernels;
-    users_type         _m_users;
+    scheduler_data_ptr _m_data;
 }; // template class scheduler
 
 } } // namespace boost::mmm

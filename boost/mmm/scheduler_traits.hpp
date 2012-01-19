@@ -28,7 +28,7 @@ struct scheduler_traits
     typename scheduler_type::strategy_traits::pool_type &
     pool() const BOOST_NOEXCEPT
     {
-        return _m_scheduler.get()._m_users;
+        return _m_scheduler.get()._m_data->users;
     }
 
 private:
