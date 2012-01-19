@@ -7,7 +7,7 @@
 #define BOOST_MMM_DETAIL_LOCKS_HPP
 
 #include <boost/ref.hpp>
-#include <boost/move/move.hpp>
+#include <boost/mmm/detail/move.hpp>
 #include <boost/swap.hpp>
 
 #include <boost/thread/locks.hpp>

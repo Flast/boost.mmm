@@ -22,7 +22,7 @@
 #endif
 #include <boost/ref.hpp>
 #include <boost/noncopyable.hpp>
-#include <boost/move/move.hpp>
+#include <boost/mmm/detail/move.hpp>
 #include <boost/lambda/bind.hpp>
 #include <boost/throw_exception.hpp>
 
@@ -36,15 +36,13 @@
 #include <boost/utility/enable_if.hpp>
 #include <boost/type_traits/is_same.hpp>
 
-#include <boost/thread/thread.hpp>
-#include <boost/mmm/detail/movable_thread.hpp>
+#include <boost/mmm/detail/thread.hpp>
 #include <boost/context/context.hpp>
 #include <boost/context/stack_utils.hpp>
 
 #include <boost/atomic.hpp>
 #include <boost/thread/condition_variable.hpp>
 #include <boost/thread/mutex.hpp>
-#include <boost/thread/locks.hpp>
 #include <boost/mmm/detail/locks.hpp>
 
 #include <boost/checked_delete.hpp>

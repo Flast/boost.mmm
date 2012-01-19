@@ -10,7 +10,7 @@ scheduler foo()
 {
     scheduler s(1);
     BOOST_REQUIRE(s.kernel_size() == 1);
-    return boost::move(s);
+    return move(s);
 }
 
 int test_main(int, char **)
@@ -18,7 +18,7 @@ int test_main(int, char **)
     scheduler s1 = foo();
     BOOST_REQUIRE(s1.kernel_size() == 1);
 
-    scheduler s2 = boost::move(s1);
+    scheduler s2 = move(s1);
     BOOST_REQUIRE(s2.kernel_size() == 1);
     return 0;
 }

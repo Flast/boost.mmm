@@ -1,10 +1,10 @@
-//          Copyright Kohei Takahashi 2011.
+//          Copyright Kohei Takahashi 2011 - 2012.
 // Distributed under the Boost Software License, Version 1.0.
 //    (See accompanying file LICENSE_1_0.txt or copy at
 //          http://www.boost.org/LICENSE_1_0.txt)
 
-#ifndef BOOST_MMM_DETAIL_MOVABLE_THREAD_HPP
-#define BOOST_MMM_DETAIL_MOVABLE_THREAD_HPP
+#ifndef BOOST_MMM_DETAIL_THREAD_HPP
+#define BOOST_MMM_DETAIL_THREAD_HPP
 
 #include <boost/config.hpp>
 #include <boost/mmm/detail/workaround.hpp>
@@ -13,8 +13,9 @@
 #include <boost/preprocessor/repetition/enum_trailing_params.hpp>
 #include <boost/preprocessor/repetition/enum_trailing_binary_params.hpp>
 
-#include <boost/move/move.hpp>
 #include <boost/thread/thread.hpp>
+
+#include <boost/mmm/detail/move.hpp>
 
 namespace boost { namespace mmm {
 
