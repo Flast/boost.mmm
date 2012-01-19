@@ -16,8 +16,8 @@
 #include <boost/config.hpp>
 #include <boost/mmm/detail/workaround.hpp>
 
-#if !defined(BOOST_MMM_CONTAINER_BREAKING_EMPLACE_RETURN_TYPE)
 #include <boost/assert.hpp>
+#if !defined(BOOST_MMM_CONTAINER_BREAKING_EMPLACE_RETURN_TYPE)
 #include <boost/mmm/detail/unused.hpp>
 #endif
 #include <boost/ref.hpp>
@@ -241,7 +241,8 @@ private:
 
 public:
     /**
-     * <b>Effects</b>: Move internal scheduler datas from other.
+     * <b>Effects</b>: Move internal scheduler datas from the other. And the
+     * other becomes <i>not-in-scheduling</i>.
      *
      * <b>Throws</b>: Nothing.
      */
@@ -249,10 +250,12 @@ public:
       : _m_data(move(other._m_data)) {}
 
     /**
-     * <b>Effects</b>: Construct with specified count <i>kernel threads</i>.
+     * <b>Effects</b>: Construct with specified count <i>kernel-threads</i>.
      *
      * <b>Throws</b>: std::invalid_argument (wrapped by Boost.Exception):
      * if default_count <= 0 .
+     *
+     * <b>Postcondition</b>: *this is <i>in-scheduling</i>.
      */
     explicit
     scheduler(const int default_count)
@@ -289,10 +292,8 @@ public:
     }
 
     /**
-     * <b>Precondition</b>: !joinable()
-     *
-     * <b>Effects</b>: Join all <i>kernel threads</i>. Call std::terminate immediately
-     * iff joinable. Users should join all <i>user threads</i> before destruct.
+     * <b>Effects</b>: Join all <i>kernel-threads</i>. Call std::terminate immediately
+     * iff joinable. Users should join all <i>user-threads</i> before destruct.
      *
      * <b>Throws</b>: Nothing.
      */
@@ -325,6 +326,7 @@ public:
     typename disable_if<is_same<size_type, Fn> >::type                      \
     add_thread(Fn fn BOOST_PP_ENUM_TRAILING_BINARY_PARAMS(n_, Arg, arg))    \
     {                                                                       \
+        BOOST_ASSERT(_m_data);                                              \
         add_thread<Fn & BOOST_PP_ENUM_TRAILING_BINARY_PARAMS(n_, Arg, & BOOST_PP_INTERCEPT)>( \
           contexts::default_stacksize()                                     \
         , fn BOOST_PP_ENUM_TRAILING_PARAMS(n_, arg));                       \
@@ -334,6 +336,7 @@ public:
     void                                                                    \
     add_thread(size_type size, Fn fn BOOST_PP_ENUM_TRAILING_BINARY_PARAMS(n_, Arg, arg)) \
     {                                                                       \
+        BOOST_ASSERT(_m_data);                                              \
         using contexts::no_stack_unwind;                                    \
         using contexts::return_to_caller;                                   \
                                                                             \
@@ -352,6 +355,8 @@ public:
 #undef BOOST_MMM_scheduler_add_thread
 #else
     /**
+     * <b>Precondition</b>: *this is <i>in-scheduling</i>.
+     *
      * <b>Effects</b>: Construct context and join to scheduling with default
      * stack size.
      *
@@ -365,11 +370,14 @@ public:
 #endif
     add_thread(Fn fn, Args... args)
     {
+        BOOST_ASSERT(_m_data);
         using contexts::default_stacksize;
         add_thread<Fn &, Args &...>(default_stacksize(), fn, args...);
     }
 
     /**
+     * <b>Precondition</b>: *this is <i>in-scheduling</i>.
+     *
      * <b>Effects</b>: Construct context and join to scheduling with specified
      * stack size.
      *
@@ -379,6 +387,7 @@ public:
     void
     add_thread(size_type size, Fn fn, Args... args)
     {
+        BOOST_ASSERT(_m_data);
         using contexts::no_stack_unwind;
         using contexts::return_to_caller;
 
@@ -404,15 +413,18 @@ private:
 #endif
 public:
     /**
-     * <b>Effects</b>: Join all <i>user threads</i>.
+     * <b>Precondition</b>: *this is <i>in-scheduling</i>.
      *
-     * <b>Postcondition</b>: !joinable()
+     * <b>Effects</b>: Join all <i>user-threads</i>.
      *
      * <b>Throws</b>: Nothing.
+     *
+     * <b>Postcondition</b>: !joinable()
      */
     void
     join_all() BOOST_NOEXCEPT
     {
+        BOOST_ASSERT(_m_data);
         unique_lock<mutex> guard(_m_data->mtx);
 
         while (joinable_nolock())
@@ -424,6 +436,8 @@ public:
     }
 
     /**
+     * <b>Precondition</b>: *this is <i>in-scheduling</i>.
+     *
      * <b>Returns</b>: true iff any contexts are still not completed. Otherwise
      * false.
      *
@@ -432,30 +446,37 @@ public:
     bool
     joinable() const BOOST_NOEXCEPT
     {
+        BOOST_ASSERT(_m_data);
         unique_lock<mutex> guard(_m_data->mtx);
         return joinable_nolock();
     }
 
     /**
-     * <b>Returns</b>: Number of <i>kernel threads</i>.
+     * <b>Precondition</b>: *this is <i>in-scheduling</i>.
+     *
+     * <b>Returns</b>: Number of <i>kernel-threads</i>.
      *
      * <b>Throws</b>: Nothing.
      */
     size_type
     kernel_size() const BOOST_NOEXCEPT
     {
+        BOOST_ASSERT(_m_data);
         unique_lock<mutex> guard(_m_data->mtx);
         return _m_data->kernels.size();
     }
 
     /**
-     * <b>Returns</b>: Number of <i>user threads</i>.
+     * <b>Precondition</b>: *this is <i>in-scheduling</i>.
+     *
+     * <b>Returns</b>: Number of <i>user-threads</i>.
      *
      * <b>Throws</b>: Nothing.
      */
     size_type
     user_size() const BOOST_NOEXCEPT
     {
+        BOOST_ASSERT(_m_data);
         unique_lock<mutex> guard(_m_data->mtx);
         return _m_data->users.size();
     }

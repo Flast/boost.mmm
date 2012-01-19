@@ -10,6 +10,7 @@
 #include <boost/detail/workaround.hpp>
 
 #include <boost/ref.hpp>
+#include <boost/assert.hpp>
 
 namespace boost { namespace mmm {
 
@@ -23,11 +24,14 @@ struct scheduler_traits
       : _m_scheduler(sch) {}
 
     /**
+     * <b>Precondition</b>: scheduler is <i>in-scheduling</i>.
+     *
      * <b>Returns</b>: Context pool.
      */
     typename scheduler_type::strategy_traits::pool_type &
     pool() const BOOST_NOEXCEPT
     {
+        BOOST_ASSERT(_m_scheduler.get()._m_data);
         return _m_scheduler.get()._m_data->users;
     }
 
