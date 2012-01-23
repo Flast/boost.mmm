@@ -51,7 +51,7 @@ public:
     context() BOOST_NOEXCEPT { return _m_ctx; }
 
     const context_type &
-    context() BOOST_NOEXCEPT const { return _m_ctx; }
+    context() const BOOST_NOEXCEPT { return _m_ctx; }
 
 #if defined(BOOST_NO_EXPLICIT_CONVERSION_OPERATORS)
     operator unspecified_bool_type() const BOOST_NOEXCEPT

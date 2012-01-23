@@ -273,8 +273,7 @@ public:
 
         for (int cnt = 0; cnt < default_count; ++cnt)
         {
-            using boost::ref;
-            thread th(&scheduler::_m_exec, ref(*this), ref(*_m_data));
+            thread th(&scheduler::_m_exec, boost::ref(*this), boost::ref(*_m_data));
 
 #if !defined(BOOST_MMM_CONTAINER_BREAKING_EMPLACE_RETURN_TYPE)
             std::pair<typename kernels_type::iterator, bool> r =
