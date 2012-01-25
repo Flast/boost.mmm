@@ -44,8 +44,18 @@ project boost/mmm
       [ library /boost/context : boost_context ]
   ;
 
+alias source_io
+  :
+  : <target-os>windows
+  ;
+
+alias source_io
+  : unistd.cpp
+  ;
+
 lib boost_mmm
   : current_context.cpp
+    source_io
   ;
 
 boost-install boost_mmm ;
