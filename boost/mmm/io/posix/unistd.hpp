@@ -16,6 +16,11 @@ namespace boost { namespace mmm { namespace io { namespace posix {
 ssize_t
 read(int, void *, size_t);
 
+/**
+ */
+ssize_t
+write(int, const void *, size_t);
+
 } } } } // namespace boost::mmm:io::posix
 
 #endif

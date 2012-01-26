@@ -8,6 +8,7 @@
 #include <poll.h>
 
 #include <boost/mmm/yield.hpp>
+#include <boost/mmm/io/posix/unistd.hpp>
 #include <boost/mmm/detail/current_context.hpp>
 
 namespace boost { namespace mmm { namespace io { namespace posix {
@@ -52,6 +53,28 @@ read(int fd, void *buf, size_t count)
         if (r != 0 && ev == POLLIN)
         {
             return ::read(fd, buf, count);
+        }
+
+        if (r < 0) { return r; }
+        this_ctx::yield();
+    }
+}
+
+ssize_t
+write(int fd, const void *buf, size_t count)
+{
+    if (not_in_scheduling())
+    {
+        return ::write(fd, buf, count);
+    }
+
+    while (true)
+    {
+        short ev = 0;
+        const int r = check_events(fd, POLLOUT, ev);
+        if (r != 0 && ev == POLLOUT)
+        {
+            return ::write(fd, buf, count);
         }
 
         if (r < 0) { return r; }
