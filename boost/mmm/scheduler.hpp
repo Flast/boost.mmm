@@ -50,7 +50,8 @@
 #if !defined(BOOST_MMM_CONTAINER_HAS_NO_ALLOCATOR_TRAITS)
 #include <boost/container/allocator/allocator_traits.hpp>
 #endif
-#if defined(BOOST_MMM_THREAD_SUPPORTS_HASHABLE_THREAD_ID)
+#if defined(BOOST_MMM_THREAD_SUPPORTS_HASHABLE_THREAD_ID) \
+ && defined(BOOST_UNORDERED_USE_MOVE)
 #include <boost/unordered_map.hpp>
 #include <boost/functional/hash.hpp>
 #else
