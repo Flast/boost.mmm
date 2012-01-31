@@ -39,6 +39,7 @@
 #include <boost/mmm/detail/thread.hpp>
 #include <boost/context/context.hpp>
 #include <boost/context/stack_utils.hpp>
+#include <boost/mmm/detail/context.hpp>
 
 #include <boost/atomic.hpp>
 #include <boost/thread/condition_variable.hpp>
@@ -142,7 +143,7 @@ private:
 #endif
     typedef mmm::scheduler_traits<this_type> scheduler_traits;
     typedef
-      mmm::strategy_traits<strategy_type, contexts::context, allocator_type>
+      mmm::strategy_traits<strategy_type, detail::asio_context, allocator_type>
     strategy_traits;
 
     typedef detail::scheduler_data<strategy_traits, allocator_type> scheduler_data;
