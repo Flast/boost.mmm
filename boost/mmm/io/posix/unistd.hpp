@@ -7,70 +7,103 @@
 #define BOOST_MMM_IO_POSIX_UNISTD_HPP
 
 #include <cstddef>
-#include <unistd.h>
-#include <poll.h>
+#include <utility>
+
+#include <boost/fusion/include/vector.hpp>
+#include <boost/fusion/include/at_c.hpp>
 
 #include <boost/context/context.hpp>
+#include <boost/mmm/detail/context.hpp>
 #include <boost/mmm/detail/current_context.hpp>
+#include <boost/mmm/io/detail/flags.hpp>
+
+#include <unistd.h>
 
 namespace boost { namespace mmm { namespace io { namespace posix {
 
-namespace {
+namespace detail {
 
-int
-check_events(int fd, short events, short &revents)
+template <typename Impl>
+typename fusion::result_of::at_c<typename Impl::data, 0>::type
+yield_blocker_syscall(int fd, int events, typename Impl::data &rd)
 {
-    struct pollfd pfd =
+    using mmm::detail::current_context::get_current_ctx;
+    using mmm::detail::asio_context;
+
+    asio_context::cb_data d =
     {
-      /*.fd      =*/ fd,
-      /*.events  =*/ events,
-      /*.revents =*/ 0
+      /*.fd     =*/ fd
+    , /*.events =*/ events
+    , /*.data   =*/ &rd
     };
-
-    const int ret = poll(&pfd, 1, 0);
-    revents = pfd.revents;
-    return ret;
+    asio_context *ctx = static_cast<asio_context *>(get_current_ctx());
+    ctx->callback     = Impl::impl;
+    ctx->data         = &d;
+    ctx->suspend();
+    return fusion::at_c<0>(rd);
 }
 
-} // anonymous namespace
+} // namespace boost::mmm::io::posix::detail
+
+namespace detail {
+
+struct read_impl
+{
+    typedef fusion::vector<ssize_t, void *, size_t> data;
+
+    static void *
+    impl(mmm::detail::asio_context::cb_data *d)
+    {
+        using fusion::at_c;
+        data &rd = *static_cast<data *>(d->data);
+        at_c<0>(rd) = ::read(d->fd, at_c<1>(rd), at_c<2>(rd));
+        return NULL;
+    }
+};
+
+} // namespace boost::mmm::io::posix::detail
 
 /**
  */
 ssize_t
-read(int fd, void *buf, std::size_t count)
+read(int fd, void *buf, size_t count)
 {
-    if (count != 0)
-    {
-        using detail::current_context::get_current_ctx;
-        while (contexts::context *ctx = get_current_ctx())
-        {
-            short ev = 0;
-            const int r = check_events(fd, POLLIN, ev);
-            if (r != 0 && ev == POLLIN) { break; }
+    if (count == 0) { return ::read(fd, buf, count); }
 
-            if (r < 0) { return r; }
-            ctx->suspend();
-        }
-    }
-    return ::read(fd, buf, count);
+    using namespace detail;
+    using io::detail::polling_events;
+
+    read_impl::data rd(0, buf, count);
+    return yield_blocker_syscall<read_impl>(fd, polling_events::in, rd);
 }
+
+namespace detail {
+
+struct write_impl
+{
+    typedef fusion::vector<ssize_t, const void *, size_t> data;
+
+    static void *
+    impl(mmm::detail::asio_context::cb_data *d)
+    {
+        using fusion::at_c;
+        data &rd = *static_cast<data *>(d->data);
+        at_c<0>(rd) = ::write(d->fd, at_c<1>(rd), at_c<2>(rd));
+        return NULL;
+    }
+};
+
+} // namespace boost::mmm::io::posix::detail
 
 /**
  */
 ssize_t
-write(int fd, const void *buf, std::size_t count)
+write(int fd, const void *buf, size_t count)
 {
-    using detail::current_context::get_current_ctx;
-    while (contexts::context *ctx = get_current_ctx())
-    {
-        short ev = 0;
-        const int r = check_events(fd, POLLOUT, ev);
-        if (r != 0 && ev == POLLOUT) { break; }
-
-        if (r < 0) { return r; }
-        ctx->suspend();
-    }
-    return ::write(fd, buf, count);
+    using namespace detail;
+    using io::detail::polling_events;
+    write_impl::data rd(0, buf, count);
+    return yield_blocker_syscall<write_impl>(fd, polling_events::out, rd);
 }
 
 } } } } // namespace boost::mmm:io::posix

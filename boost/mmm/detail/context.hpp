@@ -25,44 +25,50 @@ class asio_context
 public:
     struct cb_data
     {
-        int fd;
-        short events;
+        int  fd;
+        int  events;
         void *data;
     };
     void *(*callback)(cb_data *);
     cb_data *data;
 
-    asio_context() {}
+    asio_context()
+      : callback(0), data(0) {}
 
 #if defined(BOOST_NO_RVALUE_REFERENCES)
     template <typename Fn>
     asio_context(Fn fn, std::size_t size
     , contexts::flag_unwind_t do_unwind
     , contexts::flag_return_t do_return)
-      : _base_t(fn, size, do_unwind, do_return) {}
+      : _base_t(fn, size, do_unwind, do_return)
+      , callback(0), data(0) {}
 
     template <typename Fn, typename Alloc>
     asio_context(Fn fn, std::size_t size
     , contexts::flag_unwind_t do_unwind
     , contexts::flag_return_t do_return
     , const Alloc &alloc)
-      : _base_t(fn, size, do_unwind, do_return, alloc) {}
+      : _base_t(fn, size, do_unwind, do_return, alloc)
+      , callback(0), data(0) {}
 #endif
     template <typename Fn>
     asio_context(BOOST_RV_REF(Fn) fn, std::size_t size
     , contexts::flag_unwind_t do_unwind
     , contexts::flag_return_t do_return)
-      : _base_t(boost::move(fn), size, do_unwind, do_return) {}
+      : _base_t(boost::move(fn), size, do_unwind, do_return)
+      , callback(0), data(0) {}
 
     template <typename Fn, typename Alloc>
     asio_context(BOOST_RV_REF(Fn) fn, std::size_t size
     , contexts::flag_unwind_t do_unwind
     , contexts::flag_return_t do_return
     , const Alloc &alloc)
-      : _base_t(boost::move(fn), size, do_unwind, do_return, alloc) {}
+      : _base_t(boost::move(fn), size, do_unwind, do_return, alloc)
+      , callback(0), data(0) {}
 
     asio_context(BOOST_RV_REF(asio_context) other)
-      : _base_t(boost::move(static_cast<_base_t &>(other))), data(other.data) {}
+      : _base_t(boost::move(static_cast<_base_t &>(other)))
+      , callback(other.callback), data(other.data) {}
 
     asio_context &
     operator=(BOOST_RV_REF(asio_context) other)

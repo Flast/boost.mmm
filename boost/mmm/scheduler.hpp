@@ -63,6 +63,9 @@
 #include <boost/mmm/strategy_traits.hpp>
 #include <boost/mmm/scheduler_traits.hpp>
 
+#include <poll.h>
+#include <boost/mmm/io/detail/flags.hpp>
+
 namespace boost { namespace mmm {
 
 namespace detail {
@@ -180,9 +183,31 @@ private:
                 unique_unlock<mutex> unguard(guard);
                 context_type &ctx = ctx_guard.context();
 
-                current_context::set_current_ctx(&ctx);
-                ctx.resume();
-                current_context::set_current_ctx(0);
+                if (ctx.callback)
+                {
+                    // XXX: Temporary implementations.
+                    using mmm::io::detail::polling_events;
+                    pollfd fds =
+                    {
+                      /*.fd      =*/ ctx.data->fd
+                    , /*.events  =*/
+                        (ctx.data->events & polling_events::in  ? POLLIN  : 0)
+                      | (ctx.data->events & polling_events::out ? POLLOUT : 0)
+                    , /*.revents =*/ 0
+                    };
+                    if (::poll(&fds, 1, 0))
+                    {
+                        // TODO: Check error when return value of poll is below 0.
+                        ctx.callback(ctx.data);
+                        ctx.callback = 0;
+                    }
+                }
+                else
+                {
+                    current_context::set_current_ctx(&ctx);
+                    ctx.resume();
+                    current_context::set_current_ctx(0);
+                }
             }
             --data.runnings;
 
