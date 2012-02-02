@@ -24,7 +24,7 @@ namespace boost { namespace mmm { namespace io { namespace posix {
 namespace detail {
 
 template <typename Impl>
-typename fusion::result_of::at_c<typename Impl::data, 0>::type
+inline typename fusion::result_of::at_c<typename Impl::data, 0>::type
 yield_blocker_syscall(int fd, int events, typename Impl::data &rd)
 {
     using mmm::detail::current_context::get_current_ctx;
@@ -65,7 +65,7 @@ struct read_impl
 
 /**
  */
-ssize_t
+inline ssize_t
 read(int fd, void *buf, size_t count)
 {
     if (count == 0) { return ::read(fd, buf, count); }
@@ -97,7 +97,7 @@ struct write_impl
 
 /**
  */
-ssize_t
+inline ssize_t
 write(int fd, const void *buf, size_t count)
 {
     using namespace detail;
