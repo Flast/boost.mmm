@@ -65,8 +65,7 @@
 #include <boost/mmm/strategy_traits.hpp>
 #include <boost/mmm/scheduler_traits.hpp>
 
-#include <poll.h>
-#include <boost/mmm/io/detail/flags.hpp>
+#include <boost/mmm/io/detail/check_events.hpp>
 
 namespace boost { namespace mmm {
 
@@ -188,18 +187,9 @@ private:
                 if (ctx.callback)
                 {
                     // XXX: Temporary implementations.
-                    using mmm::io::detail::polling_events;
-                    pollfd fds =
+                    // TODO: Check error when return value of poll is below 0.
+                    if (io::detail::check_events(ctx.data->fd, ctx.data->events))
                     {
-                      /*.fd      =*/ ctx.data->fd
-                    , /*.events  =*/
-                        (ctx.data->events & polling_events::in  ? POLLIN  : 0)
-                      | (ctx.data->events & polling_events::out ? POLLOUT : 0)
-                    , /*.revents =*/ 0
-                    };
-                    if (::poll(&fds, 1, 0))
-                    {
-                        // TODO: Check error when return value of poll is below 0.
                         ctx.callback(ctx.data);
                         ctx.callback = 0;
                     }

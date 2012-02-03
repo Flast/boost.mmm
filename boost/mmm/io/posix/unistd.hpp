@@ -15,7 +15,7 @@
 #include <boost/context/context.hpp>
 #include <boost/mmm/detail/context.hpp>
 #include <boost/mmm/detail/current_context.hpp>
-#include <boost/mmm/io/detail/flags.hpp>
+#include <boost/mmm/io/detail/poll.hpp>
 
 #include <unistd.h>
 
