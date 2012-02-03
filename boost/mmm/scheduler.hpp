@@ -16,6 +16,7 @@
 #include <boost/config.hpp>
 #include <boost/mmm/detail/workaround.hpp>
 
+#include <boost/cstdint.hpp>
 #include <boost/assert.hpp>
 #if !defined(BOOST_MMM_CONTAINER_BREAKING_EMPLACE_RETURN_TYPE)
 #include <boost/mmm/detail/unused.hpp>
@@ -228,13 +229,13 @@ private:
         return context_starter<F>(f, ctx);
     }
 
-    static void *
+    static intptr_t
     start_context(context_type &ctx)
     {
         using namespace detail;
 
         current_context::set_current_ctx(&ctx);
-        void *vp = ctx.start();
+        intptr_t vp = ctx.start();
         current_context::set_current_ctx(0);
         return vp;
     }
