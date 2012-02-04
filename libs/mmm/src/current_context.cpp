@@ -17,7 +17,8 @@ using namespace std;
 
 #include <boost/context/context.hpp>
 
-#if defined(BOOST_MMM_THREAD_SUPPORTS_HASHABLE_THREAD_ID)
+#if defined(BOOST_MMM_THREAD_SUPPORTS_HASHABLE_THREAD_ID) \
+ && defined(BOOST_UNORDERED_USE_MOVE)
 #include <boost/unordered_map.hpp>
 #else
 #include <boost/container/flat_map.hpp>

@@ -16,6 +16,7 @@
 #include <boost/config.hpp>
 #include <boost/mmm/detail/workaround.hpp>
 
+#include <boost/cstdint.hpp>
 #include <boost/assert.hpp>
 #if !defined(BOOST_MMM_CONTAINER_BREAKING_EMPLACE_RETURN_TYPE)
 #include <boost/mmm/detail/unused.hpp>
@@ -51,7 +52,8 @@
 #if !defined(BOOST_MMM_CONTAINER_HAS_NO_ALLOCATOR_TRAITS)
 #include <boost/container/allocator/allocator_traits.hpp>
 #endif
-#if defined(BOOST_MMM_THREAD_SUPPORTS_HASHABLE_THREAD_ID)
+#if defined(BOOST_MMM_THREAD_SUPPORTS_HASHABLE_THREAD_ID) \
+ && defined(BOOST_UNORDERED_USE_MOVE)
 #include <boost/unordered_map.hpp>
 #include <boost/functional/hash.hpp>
 #else
@@ -253,13 +255,13 @@ private:
         return context_starter<F>(f, ctx);
     }
 
-    static void *
+    static intptr_t
     start_context(context_type &ctx)
     {
         using namespace detail;
 
         current_context::set_current_ctx(&ctx);
-        void *vp = ctx.start();
+        intptr_t vp = ctx.start();
         current_context::set_current_ctx(0);
         return vp;
     }
@@ -299,8 +301,7 @@ public:
 
         for (int cnt = 0; cnt < default_count; ++cnt)
         {
-            using boost::ref;
-            thread th(&scheduler::_m_exec, ref(*this), ref(*_m_data));
+            thread th(&scheduler::_m_exec, boost::ref(*this), boost::ref(*_m_data));
 
 #if !defined(BOOST_MMM_CONTAINER_BREAKING_EMPLACE_RETURN_TYPE)
             std::pair<typename kernels_type::iterator, bool> r =
