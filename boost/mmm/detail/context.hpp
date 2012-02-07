@@ -33,9 +33,9 @@ struct callbacks
 {
     struct cb_data
     {
-        int  fd;
-        int  events;
-        void *data;
+        int   fd;
+        short events;
+        void  *data;
     }; // struct cb_data
     void *(*callback)(cb_data *);
     cb_data *data;

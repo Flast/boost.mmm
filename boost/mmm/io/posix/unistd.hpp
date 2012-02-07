@@ -24,7 +24,7 @@ namespace detail {
 
 template <typename Impl>
 inline typename fusion::result_of::at_c<typename Impl::data, 0>::type
-yield_blocker_syscall(int fd, int events, typename Impl::data &rd)
+yield_blocker_syscall(int fd, short events, typename Impl::data &rd)
 {
     using mmm::detail::current_context::get_current_ctx;
     using mmm::detail::asio_context;

@@ -40,13 +40,13 @@ poll_result_handling(ResultType result, system::error_code &err_code)
 struct polling_events
 {
 #if defined(BOOST_MMM_DETAIL_HAS_POLL)
-    BOOST_STATIC_CONSTEXPR int in  = POLLIN;
-    BOOST_STATIC_CONSTEXPR int out = POLLOUT;
+    BOOST_STATIC_CONSTEXPR short in  = POLLIN;
+    BOOST_STATIC_CONSTEXPR short out = POLLOUT;
 #else
-    BOOST_STATIC_CONSTEXPR int in  = 1 << 0;
-    BOOST_STATIC_CONSTEXPR int out = 1 << 1;
+    BOOST_STATIC_CONSTEXPR short in  = 1 << 0;
+    BOOST_STATIC_CONSTEXPR short out = 1 << 1;
 #endif
-    BOOST_STATIC_CONSTEXPR int io  = in & out;
+    BOOST_STATIC_CONSTEXPR short io  = in & out;
 }; // struct polling_events
 
 #if defined(BOOST_MMM_DETAIL_HAS_POLL)
@@ -55,8 +55,8 @@ using ::pollfd;
 struct pollfd
 {
     int fd;
-    int events;
-    int revents;
+    short events;
+    short revents;
 }; // struct pollfd
 #endif
 

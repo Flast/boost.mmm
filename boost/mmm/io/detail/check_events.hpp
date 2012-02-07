@@ -16,7 +16,7 @@
 namespace boost { namespace mmm { namespace io { namespace detail {
 
 inline int
-check_events(int fd, int events, system::error_code &err_code)
+check_events(int fd, short events, system::error_code &err_code)
 {
     pollfd pfd =
     {
