@@ -17,7 +17,7 @@
 #   endif
 #endif
 
-#include <boost/move/move.hpp>
+#include <boost/mmm/detail/move.hpp>
 #include <boost/context/context.hpp>
 
 #if defined(BOOST_NO_VARIADIC_TEMPLATES)

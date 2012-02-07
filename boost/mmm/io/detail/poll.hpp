@@ -47,7 +47,7 @@ struct polling_events
     BOOST_STATIC_CONSTEXPR int out = 1 << 1;
 #endif
     BOOST_STATIC_CONSTEXPR int io  = in & out;
-};
+}; // struct polling_events
 
 #if defined(BOOST_MMM_DETAIL_HAS_POLL)
 using ::pollfd;
@@ -57,7 +57,7 @@ struct pollfd
     int fd;
     int events;
     int revents;
-};
+}; // struct pollfd
 #endif
 
 template <typename Rep, typename Period>

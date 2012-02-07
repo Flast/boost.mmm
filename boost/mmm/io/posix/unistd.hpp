@@ -12,7 +12,6 @@
 #include <boost/fusion/include/vector.hpp>
 #include <boost/fusion/include/at_c.hpp>
 
-#include <boost/context/context.hpp>
 #include <boost/mmm/detail/context.hpp>
 #include <boost/mmm/detail/current_context.hpp>
 #include <boost/mmm/io/detail/poll.hpp>
@@ -49,7 +48,7 @@ namespace detail {
 
 struct read_impl
 {
-    typedef fusion::vector<ssize_t, void *, size_t> data;
+    typedef fusion::vector<ssize_t, void *, std::size_t> data;
 
     static void *
     impl(mmm::detail::asio_context::cb_data *d)
@@ -59,14 +58,14 @@ struct read_impl
         at_c<0>(rd) = ::read(d->fd, at_c<1>(rd), at_c<2>(rd));
         return NULL;
     }
-};
+}; // struct read_impl
 
 } // namespace boost::mmm::io::posix::detail
 
 /**
  */
 inline ssize_t
-read(int fd, void *buf, size_t count)
+read(int fd, void *buf, std::size_t count)
 {
     if (count == 0) { return ::read(fd, buf, count); }
 
@@ -81,7 +80,7 @@ namespace detail {
 
 struct write_impl
 {
-    typedef fusion::vector<ssize_t, const void *, size_t> data;
+    typedef fusion::vector<ssize_t, const void *, std::size_t> data;
 
     static void *
     impl(mmm::detail::asio_context::cb_data *d)
@@ -91,14 +90,14 @@ struct write_impl
         at_c<0>(rd) = ::write(d->fd, at_c<1>(rd), at_c<2>(rd));
         return NULL;
     }
-};
+}; // struct write_impl
 
 } // namespace boost::mmm::io::posix::detail
 
 /**
  */
 inline ssize_t
-write(int fd, const void *buf, size_t count)
+write(int fd, const void *buf, std::size_t count)
 {
     using namespace detail;
     using io::detail::polling_events;

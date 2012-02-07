@@ -35,9 +35,8 @@
 #include <boost/type_traits/is_same.hpp>
 
 #include <boost/mmm/detail/thread.hpp>
-#include <boost/context/context.hpp>
-#include <boost/context/stack_utils.hpp>
 #include <boost/mmm/detail/context.hpp>
+#include <boost/context/stack_utils.hpp>
 
 #include <boost/system/error_code.hpp>
 
@@ -112,7 +111,7 @@ struct scheduler_data : private noncopyable
 
     scheduler_data()
       : status(0), runnings(0) {}
-};
+}; // struct scheduler_data
 
 } // namespace boost::mmm::detail
 
