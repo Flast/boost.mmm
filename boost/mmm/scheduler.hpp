@@ -9,9 +9,6 @@
 #include <cstddef>
 #include <utility>
 #include <memory>
-#include <functional>
-#include <exception>
-#include <stdexcept>
 
 #include <boost/config.hpp>
 #include <boost/mmm/detail/workaround.hpp>
@@ -23,6 +20,8 @@
 #include <boost/ref.hpp>
 #include <boost/noncopyable.hpp>
 #include <boost/mmm/detail/move.hpp>
+
+#include <stdexcept>
 #include <boost/throw_exception.hpp>
 
 #if defined(BOOST_NO_VARIADIC_TEMPLATES)
@@ -46,9 +45,11 @@
 
 #include <boost/checked_delete.hpp>
 #include <boost/interprocess/smart_ptr/unique_ptr.hpp>
+
 #if !defined(BOOST_MMM_CONTAINER_HAS_NO_ALLOCATOR_TRAITS)
 #include <boost/container/allocator/allocator_traits.hpp>
 #endif
+#include <functional>
 #if defined(BOOST_MMM_THREAD_SUPPORTS_HASHABLE_THREAD_ID) \
  && defined(BOOST_UNORDERED_USE_MOVE)
 #include <boost/unordered_map.hpp>
@@ -104,7 +105,6 @@ struct scheduler_data : private noncopyable
     kernels_type       kernels;
     users_type         users;
 
-    explicit
     scheduler_data()
       : status(0), runnings(0) {}
 };
@@ -155,10 +155,19 @@ public:
 private:
 #if !defined(BOOST_MMM_DOXYGEN_INVOKED)
     void
+    _m_resume_context(unique_lock<mutex> &guard, context_type &ctx)
+    {
+        using namespace detail;
+        unique_unlock<mutex> unguard(guard);
+
+        current_context::set_current_ctx(&ctx);
+        ctx.resume();
+        current_context::set_current_ctx(0);
+    }
+
+    void
     _m_exec(scheduler_data &data)
     {
-        strategy_traits traits;
-
         while (!(data.status & _st_terminate))
         {
             // Lock until to be able to get least one context.
@@ -171,18 +180,10 @@ private:
             }
             if (data.status & _st_terminate) { break; }
 
-            context_guard ctx_guard(scheduler_traits(*this), traits);
+            context_guard ctx_guard(scheduler_traits(*this), strategy_traits());
 
             ++data.runnings;
-            {
-                using namespace detail;
-                unique_unlock<mutex> unguard(guard);
-                context_type &ctx = ctx_guard.context();
-
-                current_context::set_current_ctx(&ctx);
-                ctx.resume();
-                current_context::set_current_ctx(0);
-            }
+            _m_resume_context(guard, ctx_guard.context());
             --data.runnings;
 
             // Notify all even if context is finished to wakeup caller of join_all.
@@ -211,17 +212,17 @@ private:
           : _m_ctx(ctx) {}
 
 #if defined(BOOST_NO_VARIADIC_TEMPLATES)
-#define BOOST_MMM_context_starter_operator_call(unused_z_, n_, unused_data_)    \
-        template <typename Fn BOOST_PP_ENUM_TRAILING_PARAMS(n_, typename Arg)>  \
-        void                                                                    \
+#define BOOST_MMM_context_starter_op_call(unused_z_, n_, unused_data_)  \
+        template <typename Fn BOOST_PP_ENUM_TRAILING_PARAMS(n_, typename Arg)> \
+        void                                                            \
         operator()(Fn &fn BOOST_PP_ENUM_TRAILING_BINARY_PARAMS(n_, Arg, &arg)) const \
-        {                                                                       \
-            _m_ctx.get().suspend();                                             \
-            fn(BOOST_PP_ENUM_PARAMS(n_, arg));                                  \
-        }                                                                       \
-// BOOST_MMM_context_starter_operator_call
-        BOOST_PP_REPEAT(BOOST_PP_INC(BOOST_CONTEXT_ARITY), BOOST_MMM_context_starter_operator_call, ~)
-#undef BOOST_MMM_context_starter_operator_call
+        {                                                               \
+            _m_ctx.get().suspend();                                     \
+            fn(BOOST_PP_ENUM_PARAMS(n_, arg));                          \
+        }                                                               \
+// BOOST_MMM_context_starter_op_call
+        BOOST_PP_REPEAT(BOOST_PP_INC(BOOST_CONTEXT_ARITY), BOOST_MMM_context_starter_op_call, ~)
+#undef BOOST_MMM_context_starter_op_call
 #else
         template <typename Fn, typename... Args>
         void
