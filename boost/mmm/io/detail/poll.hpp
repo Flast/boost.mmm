@@ -82,7 +82,7 @@ poll_fds(pollfd *fds, int count, boost::chrono::duration<Rep, Period> timeout)
         if (fd.events & polling_events::out) { FD_SET(fd.fd, &writefds); }
     }
 
-    const int result = ::select(nfds, &readfds, &writefds, 0, to);
+    const int result = ::select(nfds + 1, &readfds, &writefds, 0, to);
 
     for (int i = 0; i < count; ++i)
     {
