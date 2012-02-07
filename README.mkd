@@ -14,7 +14,6 @@ Depends:
 >
 > * [Boost](http://www.boost.org/) 1.48.0 or later
 > * [Boost.Context](https://github.com/olk/boost.context) (not in trunk)
-> * [Boost.Atomic](http://www.chaoticmind.net/~hcb/projects/boost.atomic/) (not in trunk)
 
 License:
 --------

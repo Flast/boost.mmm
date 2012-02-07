@@ -9,14 +9,10 @@
 #include <cstddef>
 #include <utility>
 #include <memory>
-#include <functional>
-#include <exception>
-#include <stdexcept>
 
 #include <boost/config.hpp>
 #include <boost/mmm/detail/workaround.hpp>
 
-#include <boost/cstdint.hpp>
 #include <boost/assert.hpp>
 #if !defined(BOOST_MMM_CONTAINER_BREAKING_EMPLACE_RETURN_TYPE)
 #include <boost/mmm/detail/unused.hpp>
@@ -24,7 +20,8 @@
 #include <boost/ref.hpp>
 #include <boost/noncopyable.hpp>
 #include <boost/mmm/detail/move.hpp>
-#include <boost/lambda/bind.hpp>
+
+#include <stdexcept>
 #include <boost/throw_exception.hpp>
 
 #if defined(BOOST_NO_VARIADIC_TEMPLATES)
@@ -51,9 +48,11 @@
 
 #include <boost/checked_delete.hpp>
 #include <boost/interprocess/smart_ptr/unique_ptr.hpp>
+
 #if !defined(BOOST_MMM_CONTAINER_HAS_NO_ALLOCATOR_TRAITS)
 #include <boost/container/allocator/allocator_traits.hpp>
 #endif
+#include <functional>
 #if defined(BOOST_MMM_THREAD_SUPPORTS_HASHABLE_THREAD_ID) \
  && defined(BOOST_UNORDERED_USE_MOVE)
 #include <boost/unordered_map.hpp>
@@ -111,7 +110,6 @@ struct scheduler_data : private noncopyable
     kernels_type       kernels;
     users_type         users;
 
-    explicit
     scheduler_data()
       : status(0), runnings(0) {}
 };
@@ -162,10 +160,32 @@ public:
 private:
 #if !defined(BOOST_MMM_DOXYGEN_INVOKED)
     void
+    _m_resume_context(unique_lock<mutex> &guard, context_type &ctx)
+    {
+        using namespace detail;
+        unique_unlock<mutex> unguard(guard);
+
+        if (ctx.callback)
+        {
+            using io::detail::check_events;
+            system::error_code err_code;
+            if (check_events(ctx.data->fd, ctx.data->events, err_code))
+            {
+                ctx.callback(ctx.data);
+                ctx.callback = 0;
+            }
+        }
+        else
+        {
+            current_context::set_current_ctx(&ctx);
+            ctx.resume();
+            current_context::set_current_ctx(0);
+        }
+    }
+
+    void
     _m_exec(scheduler_data &data)
     {
-        strategy_traits traits;
-
         while (!(data.status & _st_terminate))
         {
             // Lock until to be able to get least one context.
@@ -178,31 +198,10 @@ private:
             }
             if (data.status & _st_terminate) { break; }
 
-            context_guard ctx_guard(scheduler_traits(*this), traits);
+            context_guard ctx_guard(scheduler_traits(*this), strategy_traits());
 
             ++data.runnings;
-            {
-                using namespace detail;
-                unique_unlock<mutex> unguard(guard);
-                context_type &ctx = ctx_guard.context();
-
-                if (ctx.callback)
-                {
-                    using io::detail::check_events;
-                    system::error_code err_code;
-                    if (check_events(ctx.data->fd, ctx.data->events, err_code))
-                    {
-                        ctx.callback(ctx.data);
-                        ctx.callback = 0;
-                    }
-                }
-                else
-                {
-                    current_context::set_current_ctx(&ctx);
-                    ctx.resume();
-                    current_context::set_current_ctx(0);
-                }
-            }
+            _m_resume_context(guard, ctx_guard.context());
             --data.runnings;
 
             // Notify all even if context is finished to wakeup caller of join_all.
@@ -222,40 +221,45 @@ private:
 
     // To run context should call start(). However, cannot get informations
     // about the context was started.
-    template <typename F>
     struct context_starter
     {
-        F _m_functor;
         reference_wrapper<context_type> _m_ctx;
 
         explicit
-        context_starter(const F &functor, context_type &ctx)
-          : _m_functor(functor), _m_ctx(ctx) {}
+        context_starter(context_type &ctx)
+          : _m_ctx(ctx) {}
 
+#if defined(BOOST_NO_VARIADIC_TEMPLATES)
+#define BOOST_MMM_context_starter_op_call(unused_z_, n_, unused_data_)  \
+        template <typename Fn BOOST_PP_ENUM_TRAILING_PARAMS(n_, typename Arg)> \
+        void                                                            \
+        operator()(Fn &fn BOOST_PP_ENUM_TRAILING_BINARY_PARAMS(n_, Arg, &arg)) const \
+        {                                                               \
+            _m_ctx.get().suspend();                                     \
+            fn(BOOST_PP_ENUM_PARAMS(n_, arg));                          \
+        }                                                               \
+// BOOST_MMM_context_starter_op_call
+        BOOST_PP_REPEAT(BOOST_PP_INC(BOOST_CONTEXT_ARITY), BOOST_MMM_context_starter_op_call, ~)
+#undef BOOST_MMM_context_starter_op_call
+#else
+        template <typename Fn, typename... Args>
         void
-        operator()() const
+        operator()(Fn &fn, Args &... args) const
         {
             _m_ctx.get().suspend();
-            _m_functor();
+            fn(args...);
         }
+#endif
     }; // template struct context_starter
 
-    template <typename F>
-    static context_starter<F>
-    make_context_starter(const F &f, context_type &ctx)
-    {
-        return context_starter<F>(f, ctx);
-    }
-
-    static intptr_t
+    static void
     start_context(context_type &ctx)
     {
         using namespace detail;
 
         current_context::set_current_ctx(&ctx);
-        intptr_t vp = ctx.start();
+        ctx.start();
         current_context::set_current_ctx(0);
-        return vp;
     }
 #endif
 
@@ -361,7 +365,7 @@ public:
                                                                             \
         context_type ctx;                                                   \
         context_type(                                                       \
-          make_context_starter(lambda::bind(fn BOOST_PP_ENUM_TRAILING_PARAMS(n_, arg)), ctx) \
+          context_starter(ctx), fn BOOST_PP_ENUM_TRAILING_PARAMS(n_, arg) \
         , size, no_stack_unwind, return_to_caller).swap(ctx);               \
         start_context(ctx);                                                 \
                                                                             \
@@ -412,7 +416,7 @@ public:
 
         context_type ctx;
         context_type(
-          make_context_starter(lambda::bind(fn, args...), ctx)
+          context_starter(ctx), fn, args...
         , size, no_stack_unwind, return_to_caller).swap(ctx);
         start_context(ctx);
 
