@@ -9,9 +9,11 @@
 #include <boost/config.hpp>
 #include <boost/mmm/detail/workaround.hpp>
 
+#if defined(BOOST_NO_VARIADIC_TEMPLATES)
 #include <boost/preprocessor/repetition/repeat.hpp>
 #include <boost/preprocessor/repetition/enum_trailing_params.hpp>
 #include <boost/preprocessor/repetition/enum_trailing_binary_params.hpp>
+#endif
 
 #include <boost/thread/thread.hpp>
 
@@ -52,15 +54,21 @@ public:
     thread(BOOST_RV_REF(thread) x)
       : _base_t(x.move()) {}
 
+#if defined(BOOST_NO_VARIADIC_TEMPLATES)
 #define BOOST_MMM_thread_variadic_ctor(unused_r_, n_, unused_data_) \
-  template <                                                        \
-    typename F BOOST_PP_ENUM_TRAILING_PARAMS(n_, typename A)>       \
+  template <typename F BOOST_PP_ENUM_TRAILING_PARAMS(n_, typename A)> \
   explicit                                                          \
   thread(F f BOOST_PP_ENUM_TRAILING_BINARY_PARAMS(n_, A, a))        \
     : _base_t(f BOOST_PP_ENUM_TRAILING_PARAMS(n_, a)) {}            \
 // BOOST_MMM_thread_variadic_ctor
     BOOST_PP_REPEAT(10, BOOST_MMM_thread_variadic_ctor, ~)
 #undef BOOST_MMM_thread_variadic_ctor
+#else
+  template <typename F, typename... Args>
+  explicit
+  thread(F f, Args... args)
+    : _base_t(f, args...) {}
+#endif
 
     thread &
     operator=(BOOST_RV_REF(thread) x)
