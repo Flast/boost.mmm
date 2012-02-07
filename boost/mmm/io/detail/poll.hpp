@@ -15,6 +15,9 @@
 #include <boost/optional.hpp>
 #include <boost/chrono/duration.hpp>
 
+#include <cerrno>
+#include <boost/system/error_code.hpp>
+
 #include <sys/time.h>
 #if defined(BOOST_MMM_DETAIL_HAS_POLL)
 #include <sys/poll.h>
@@ -23,6 +26,16 @@
 #endif
 
 namespace boost { namespace mmm { namespace io { namespace detail {
+
+template <typename ResultType>
+inline ResultType
+poll_result_handling(ResultType result, system::error_code &err_code)
+{
+    err_code = result < 0
+      ? system::error_code(errno, system::system_category())
+      : system::error_code();
+    return result;
+}
 
 struct polling_events
 {
@@ -49,13 +62,15 @@ struct pollfd
 
 template <typename Rep, typename Period>
 inline int
-poll_fds_impl(pollfd *fds, int count, boost::chrono::duration<Rep, Period> *timeout)
+poll_fds_impl(pollfd *fds, int count
+, boost::chrono::duration<Rep, Period> *timeout
+, system::error_code &err_code)
 {
     using boost::chrono::duration_cast;
 #if defined(BOOST_MMM_DETAIL_HAS_POLL)
     using boost::chrono::milliseconds;
     const int to = timeout ? duration_cast<milliseconds>(*timeout).count() : -1;
-    return ::poll(fds, count, to);
+    return poll_result_handling(::poll(fds, count, to), err_code);
 #else
     using boost::chrono::seconds;
     using boost::chrono::microseconds;
@@ -81,6 +96,7 @@ poll_fds_impl(pollfd *fds, int count, boost::chrono::duration<Rep, Period> *time
     }
 
     const int result = ::select(nfds + 1, &readfds, &writefds, 0, to);
+    poll_result_handling(result, err_code);
 
     for (int i = 0; i < count; ++i)
     {
@@ -102,15 +118,18 @@ poll_fds_impl(pollfd *fds, int count, boost::chrono::duration<Rep, Period> *time
 
 template <typename Rep, typename Period>
 inline int
-poll_fds(pollfd *fds, int count, boost::chrono::duration<Rep, Period> timeout)
+poll_fds(pollfd *fds, int count
+, boost::chrono::duration<Rep, Period> timeout
+, system::error_code &err_code)
 {
-    return poll_fds_impl(fds, count, &timeout);
+    return poll_fds_impl(fds, count, &timeout, err_code);
 }
 
 inline int
-poll_fds(pollfd *fds, int count)
+poll_fds(pollfd *fds, int count, system::error_code &err_code)
 {
-    return poll_fds_impl(fds, count, static_cast<boost::chrono::seconds *>(0));
+    using boost::chrono::seconds;
+    return poll_fds_impl(fds, count, static_cast<seconds *>(0), err_code);
 }
 
 } } } } // namespace boost::mmm::io::detail

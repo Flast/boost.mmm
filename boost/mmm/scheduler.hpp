@@ -42,6 +42,8 @@
 #include <boost/context/stack_utils.hpp>
 #include <boost/mmm/detail/context.hpp>
 
+#include <boost/system/error_code.hpp>
+
 #include <boost/atomic.hpp>
 #include <boost/thread/condition_variable.hpp>
 #include <boost/thread/mutex.hpp>
@@ -186,9 +188,9 @@ private:
 
                 if (ctx.callback)
                 {
-                    // XXX: Temporary implementations.
-                    // TODO: Check error when return value of poll is below 0.
-                    if (io::detail::check_events(ctx.data->fd, ctx.data->events))
+                    using io::detail::check_events;
+                    system::error_code err_code;
+                    if (check_events(ctx.data->fd, ctx.data->events, err_code))
                     {
                         ctx.callback(ctx.data);
                         ctx.callback = 0;

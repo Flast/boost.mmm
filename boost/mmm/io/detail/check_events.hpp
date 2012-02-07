@@ -11,10 +11,12 @@
 #include <boost/mmm/io/detail/poll.hpp>
 #include <boost/chrono/duration.hpp>
 
+#include <boost/system/error_code.hpp>
+
 namespace boost { namespace mmm { namespace io { namespace detail {
 
 inline int
-check_events(int fd, int events)
+check_events(int fd, int events, system::error_code &err_code)
 {
     pollfd pfd =
     {
@@ -22,7 +24,11 @@ check_events(int fd, int events)
     , /*.events  =*/ events
     , /*.revents =*/ 0
     };
-    return poll_fds(&pfd, 1, boost::chrono::seconds(0));
+    if (poll_fds(&pfd, 1, boost::chrono::seconds(0), err_code) == 1)
+    {
+        return pfd.revents;
+    }
+    return 0;
 }
 
 } } } } // namespace boost::mmm:io::detail
