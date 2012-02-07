@@ -82,11 +82,11 @@ poll_fds(pollfd *fds, int count, boost::chrono::duration<Rep, Period> timeout)
         if (fd.events & polling_events::out) { FD_SET(fd.fd, &writefds); }
     }
 
-    const int result = ::select(nfds, &readfds, &writefds, 0, &to);
+    const int result = ::select(nfds, &readfds, &writefds, 0, to);
 
     for (int i = 0; i < count; ++i)
     {
-        const pollfd &fd = fds[i];
+        pollfd &fd = fds[i];
         fd.revents = 0;
         if (fd.events & polling_events::in && FD_ISSET(fd.fd, &readfds))
         {
