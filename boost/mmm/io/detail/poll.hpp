@@ -49,27 +49,25 @@ struct pollfd
 
 template <typename Rep, typename Period>
 inline int
-poll_fds(pollfd *fds, int count, boost::chrono::duration<Rep, Period> timeout)
+poll_fds_impl(pollfd *fds, int count, boost::chrono::duration<Rep, Period> *timeout)
 {
     using boost::chrono::duration_cast;
 #if defined(BOOST_MMM_DETAIL_HAS_POLL)
     using boost::chrono::milliseconds;
-    const int to = /*timeout == none
-      ? -1
-      :*/ duration_cast<milliseconds>(timeout).count();
+    const int to = timeout ? duration_cast<milliseconds>(*timeout).count() : -1;
     return ::poll(fds, count, to);
 #else
     using boost::chrono::seconds;
     using boost::chrono::microseconds;
 
     timeval _to, *to = 0;
-    //if (timeout == none)
-    //{
-        const seconds sec = duration_cast<seconds>(timeout);
+    if (timeout)
+    {
+        const seconds sec = duration_cast<seconds>(*timeout);
         _to.tv_sec  = sec.count();
-        _to.tv_usec = duration_cast<microseconds>(timeout - sec).count();
+        _to.tv_usec = duration_cast<microseconds>(*timeout - sec).count();
         to = &_to;
-    //}
+    }
 
     int nfds = -1;
     fd_set readfds;  FD_ZERO(&readfds);
@@ -100,6 +98,19 @@ poll_fds(pollfd *fds, int count, boost::chrono::duration<Rep, Period> timeout)
 
     return result;
 #endif
+}
+
+template <typename Rep, typename Period>
+inline int
+poll_fds(pollfd *fds, int count, boost::chrono::duration<Rep, Period> timeout)
+{
+    return poll_fds_impl(fds, count, &timeout);
+}
+
+inline int
+poll_fds(pollfd *fds, int count)
+{
+    return poll_fds_impl(fds, count, static_cast<boost::chrono::seconds *>(0));
 }
 
 } } } } // namespace boost::mmm::io::detail
