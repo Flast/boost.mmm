@@ -15,14 +15,8 @@
 
 namespace boost { namespace mmm { namespace detail {
 
-class asio_context
-  : public contexts::context
+struct callbacks
 {
-    typedef contexts::context _base_t;
-
-    BOOST_MOVABLE_BUT_NOT_COPYABLE(asio_context)
-
-public:
     struct cb_data
     {
         int  fd;
@@ -32,43 +26,66 @@ public:
     void *(*callback)(cb_data *);
     cb_data *data;
 
-    asio_context()
+    callbacks()
       : callback(0), data(0) {}
+
+    void
+    swap(callbacks &other)
+    {
+        using std::swap;
+        swap(callback, other.callback);
+        swap(data    , other.data);
+    }
+};
+
+inline void
+swap(callbacks &l, callbacks &r)
+{
+    l.swap(r);
+}
+
+class asio_context
+  : public contexts::context
+  , public callbacks
+{
+    typedef contexts::context _ctx_base_t;
+    typedef callbacks         _cb_base_t;
+
+    BOOST_MOVABLE_BUT_NOT_COPYABLE(asio_context)
+
+public:
+    asio_context() {}
 
 #if defined(BOOST_NO_RVALUE_REFERENCES)
     template <typename Fn>
     asio_context(Fn fn, std::size_t size
     , contexts::flag_unwind_t do_unwind
     , contexts::flag_return_t do_return)
-      : _base_t(fn, size, do_unwind, do_return)
-      , callback(0), data(0) {}
+      : _ctx_base_t(fn, size, do_unwind, do_return) {}
 
     template <typename Fn, typename Alloc>
     asio_context(Fn fn, std::size_t size
     , contexts::flag_unwind_t do_unwind
     , contexts::flag_return_t do_return
     , const Alloc &alloc)
-      : _base_t(fn, size, do_unwind, do_return, alloc)
-      , callback(0), data(0) {}
+      : _ctx_base_t(fn, size, do_unwind, do_return, alloc) {}
 #endif
     template <typename Fn>
     asio_context(BOOST_RV_REF(Fn) fn, std::size_t size
     , contexts::flag_unwind_t do_unwind
     , contexts::flag_return_t do_return)
-      : _base_t(boost::move(fn), size, do_unwind, do_return)
-      , callback(0), data(0) {}
+      : _ctx_base_t(boost::move(fn), size, do_unwind, do_return) {}
 
     template <typename Fn, typename Alloc>
     asio_context(BOOST_RV_REF(Fn) fn, std::size_t size
     , contexts::flag_unwind_t do_unwind
     , contexts::flag_return_t do_return
     , const Alloc &alloc)
-      : _base_t(boost::move(fn), size, do_unwind, do_return, alloc)
-      , callback(0), data(0) {}
+      : _ctx_base_t(boost::move(fn), size, do_unwind, do_return, alloc) {}
 
     asio_context(BOOST_RV_REF(asio_context) other)
-      : _base_t(boost::move(static_cast<_base_t &>(other)))
-      , callback(other.callback), data(other.data) {}
+      : _ctx_base_t(boost::move(static_cast<_ctx_base_t &>(other)))
+      , _cb_base_t(other) {}
 
     asio_context &
     operator=(BOOST_RV_REF(asio_context) other)
@@ -80,10 +97,8 @@ public:
     void
     swap(asio_context &other)
     {
-        using std::swap;
-        swap(callback, other.callback);
-        swap(data    , other.data);
-        _base_t::swap(other);
+        _ctx_base_t::swap(other);
+        _cb_base_t::swap(other);
     }
 };
 
