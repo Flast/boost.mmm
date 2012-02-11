@@ -49,7 +49,7 @@ class async_io_thread
     struct check_event
     {
         bool
-        operator()(const io::detail::pollfds &pfd)
+        operator()(const io::detail::pollfd &pfd)
         {
             return pfd.revents != 0;
         }
@@ -70,7 +70,7 @@ class async_io_thread
                 // break poller. The range([itr, ends)) contains descrptors:
                 // ready to operate I/O request.
                 using std::partition;
-                pollfd_vector::iterator itr =
+                typename pollfd_vector::iterator itr =
                   partition(++_m_pfds.begin(), _m_pfds.end(), check_event());
 
                 // TODO: collect descrptors
