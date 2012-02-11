@@ -25,6 +25,9 @@
 #include <sys/select.h>
 #endif
 
+#include <boost/foreach.hpp>
+#include <boost/mmm/detail/array_ref.hpp>
+
 namespace boost { namespace mmm { namespace io { namespace detail {
 
 template <typename ResultType>
@@ -62,7 +65,7 @@ struct pollfd
 
 template <typename Rep, typename Period>
 inline int
-poll_fds_impl(pollfd *fds, int count
+poll_fds_impl(mmm::detail::array_ref<pollfd> fds
 , boost::chrono::duration<Rep, Period> *timeout
 , system::error_code &err_code)
 {
@@ -70,7 +73,7 @@ poll_fds_impl(pollfd *fds, int count
 #if defined(BOOST_MMM_DETAIL_HAS_POLL)
     using boost::chrono::milliseconds;
     const int to = timeout ? duration_cast<milliseconds>(*timeout).count() : -1;
-    return poll_result_handling(::poll(fds, count, to), err_code);
+    return poll_result_handling(::poll(fds.data(), fds.size(), to), err_code);
 #else
     using boost::chrono::seconds;
     using boost::chrono::microseconds;
@@ -87,9 +90,9 @@ poll_fds_impl(pollfd *fds, int count
     int nfds = -1;
     fd_set readfds;  FD_ZERO(&readfds);
     fd_set writefds; FD_ZERO(&writefds);
-    for (int i = 0; i < count; ++i)
+
+    BOOST_FOREACH(const pollfd &fd, fds)
     {
-        const pollfd &fd = fds[i];
         nfds = (nfds < fd.fd) ? fd.fd : nfds;
         if (fd.events & polling_events::in) { FD_SET(fd.fd, &readfds); }
         if (fd.events & polling_events::out) { FD_SET(fd.fd, &writefds); }
@@ -98,9 +101,8 @@ poll_fds_impl(pollfd *fds, int count
     const int result = ::select(nfds + 1, &readfds, &writefds, 0, to);
     poll_result_handling(result, err_code);
 
-    for (int i = 0; i < count; ++i)
+    BOOST_FOREACH(pollfd &fd, fds)
     {
-        pollfd &fd = fds[i];
         fd.revents = 0;
         if (fd.events & polling_events::in && FD_ISSET(fd.fd, &readfds))
         {
@@ -118,18 +120,18 @@ poll_fds_impl(pollfd *fds, int count
 
 template <typename Rep, typename Period>
 inline int
-poll_fds(pollfd *fds, int count
+poll_fds(mmm::detail::array_ref<pollfd> fds
 , boost::chrono::duration<Rep, Period> timeout
 , system::error_code &err_code)
 {
-    return poll_fds_impl(fds, count, &timeout, err_code);
+    return poll_fds_impl(fds, &timeout, err_code);
 }
 
 inline int
-poll_fds(pollfd *fds, int count, system::error_code &err_code)
+poll_fds(mmm::detail::array_ref<pollfd> fds, system::error_code &err_code)
 {
     using boost::chrono::seconds;
-    return poll_fds_impl(fds, count, static_cast<seconds *>(0), err_code);
+    return poll_fds_impl(fds, static_cast<seconds *>(0), err_code);
 }
 
 } } } } // namespace boost::mmm::io::detail

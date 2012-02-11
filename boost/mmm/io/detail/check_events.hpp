@@ -13,6 +13,8 @@
 
 #include <boost/system/error_code.hpp>
 
+#include <boost/mmm/detail/array_ref.hpp>
+
 namespace boost { namespace mmm { namespace io { namespace detail {
 
 inline int
@@ -24,7 +26,9 @@ check_events(int fd, short events, system::error_code &err_code)
     , /*.events  =*/ events
     , /*.revents =*/ 0
     };
-    if (poll_fds(&pfd, 1, boost::chrono::seconds(0), err_code) == 1)
+    using mmm::detail::make_array_ref;
+    using boost::chrono::seconds;
+    if (poll_fds(make_array_ref(&pfd, 1), seconds(0), err_code) == 1)
     {
         return pfd.revents;
     }
