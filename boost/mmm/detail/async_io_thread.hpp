@@ -8,6 +8,7 @@
 
 #include <boost/mmm/detail/workaround.hpp>
 
+#include <boost/assert.hpp>
 #include <boost/ref.hpp>
 #include <boost/mmm/detail/move.hpp>
 
@@ -19,20 +20,32 @@
 #include <boost/mmm/detail/thread.hpp>
 
 #include <algorithm>
+#include <utility>
+#include <boost/iterator/zip_iterator.hpp>
 #include <boost/system/error_code.hpp>
 #include <boost/mmm/io/detail/poll.hpp>
 
 namespace boost { namespace mmm { namespace detail {
 
-template <typename Alloc>
+template <typename Context, typename Alloc>
 class async_io_thread
 {
     BOOST_MOVABLE_BUT_NOT_COPYABLE(async_io_thread)
 
+    typedef Context context_type;
     typedef Alloc allocator_type;
 #if !defined(BOOST_MMM_CONTAINER_HAS_NO_ALLOCATOR_TRAITS)
     typedef container::allocator_traits<allocator_type> allocator_traits;
 #endif
+
+    typedef
+#if !defined(BOOST_MMM_CONTAINER_HAS_NO_ALLOCATOR_TRAITS)
+      typename allocator_traits::template rebind_alloc<context_type *>
+#else
+      typename allocator_type::template rebind<context_type *>::other
+#endif
+    ctxptr_alloc_type;
+
     typedef
 #if !defined(BOOST_MMM_CONTAINER_HAS_NO_ALLOCATOR_TRAITS)
       typename allocator_traits::template rebind_alloc<io::detail::pollfd>
@@ -41,15 +54,17 @@ class async_io_thread
 #endif
     pfd_alloc_type;
 
+    typedef container::vector<context_type *, ctxptr_alloc_type> ctxptr_vector;
     typedef container::vector<io::detail::pollfd, pfd_alloc_type> pollfd_vector;
 
     thread        _m_th;
+    ctxptr_vector _m_ctxptr;
     pollfd_vector _m_pfds;
 
     struct check_event
     {
         bool
-        operator()(const io::detail::pollfd &pfd)
+        operator()(const io::detail::pollfd &pfd, const context_type *)
         {
             return pfd.revents != 0;
         }
@@ -66,16 +81,26 @@ class async_io_thread
             const int ret = poll_fds(_m_pfds.data(), _m_pfds.count(), err_code);
             if (!err_code && 0 < ret)
             {
+                using namespace std;
+                typedef
+                  pair<
+                    typename pollfd_vector::iterator
+                  , typename ctxptr_vector::iterator>
+                iterator_pair;
+
                 // NOTE: Do not move first descrptor, due to contains pipe to
                 // break poller. The range([itr, ends)) contains descrptors:
                 // ready to operate I/O request.
-                using std::partition;
-                typename pollfd_vector::iterator itr =
-                  partition(++_m_pfds.begin(), _m_pfds.end(), check_event());
+                zip_iterator<iterator_pair> itr =
+                  partition(
+                    ++make_zip_iterator(make_pair(_m_pfds.begin(), _m_ctxptr.begin()))
+                  , make_zip_iterator(make_pair(_m_pfds.end(), _m_ctxptr.end()))
+                  , check_event());
 
                 // TODO: collect descrptors
 
-                _m_pfds.erase(itr, _m_pfds.end());
+                _m_pfds.erase(itr->first, _m_pfds.end());
+                _m_ctxptr.erase(itr->second, _m_ctxptr.end());
             }
         }
     }
@@ -85,6 +110,8 @@ public:
       : _m_th(&async_io_thread::exec, boost::ref(*this))
     {
         // TODO: create a pipe to break poller
+        _m_ctxptr.push_back(0);
+        BOOST_ASSERT(_m_pfds.size() == 1 && _m_ctxptr.size() == 1);
     }
 
     async_io_thread(BOOST_RV_REF(async_io_thread) other)
@@ -111,9 +138,9 @@ public:
     }
 }; // template class async_io_thread
 
-template <typename Alloc>
+template <typename C, typename A>
 inline void
-swap(async_io_thread<Alloc> &l, async_io_thread<Alloc> &r)
+swap(async_io_thread<C, A> &l, async_io_thread<C, A> &r)
 {
     l.swap(r);
 }
