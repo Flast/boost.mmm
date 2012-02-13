@@ -82,11 +82,11 @@ struct scheduler_data : private noncopyable
     struct map_type
     {
         typedef std::pair<const Key, Elem> value_type;
-        typedef
+        typedef typename
 #if !defined(BOOST_MMM_CONTAINER_HAS_NO_ALLOCATOR_TRAITS)
-          typename allocator_traits::template rebind_alloc<value_type>
+          allocator_traits::template rebind_alloc<value_type>
 #else
-          typename Allocator::template rebind<value_type>::other
+          Allocator::template rebind<value_type>::other
 #endif
         alloc_type;
 
