@@ -32,6 +32,8 @@ class async_io_thread
 {
     BOOST_MOVABLE_BUT_NOT_COPYABLE(async_io_thread)
 
+    typedef io::detail::pollfd pollfd;
+
     typedef Context context_type;
     typedef Alloc allocator_type;
 #if !defined(BOOST_MMM_CONTAINER_HAS_NO_ALLOCATOR_TRAITS)
@@ -48,14 +50,14 @@ class async_io_thread
 
     typedef
 #if !defined(BOOST_MMM_CONTAINER_HAS_NO_ALLOCATOR_TRAITS)
-      typename allocator_traits::template rebind_alloc<io::detail::pollfd>
+      typename allocator_traits::template rebind_alloc<pollfd>
 #else
-      typename allocator_type::template rebind<io::detail::pollfd>::other
+      typename allocator_type::template rebind<pollfd>::other
 #endif
     pfd_alloc_type;
 
     typedef container::vector<context_type *, ctxptr_alloc_type> ctxptr_vector;
-    typedef container::vector<io::detail::pollfd, pfd_alloc_type> pollfd_vector;
+    typedef container::vector<pollfd, pfd_alloc_type> pollfd_vector;
 
     thread        _m_th;
     ctxptr_vector _m_ctxptr;
@@ -64,7 +66,7 @@ class async_io_thread
     struct check_event
     {
         bool
-        operator()(boost::tuple<const io::detail::pollfd &, const context_type *> pfd)
+        operator()(boost::tuple<const pollfd &, const context_type *> pfd)
         {
             return boost::get<0>(pfd).revents != 0;
         }
