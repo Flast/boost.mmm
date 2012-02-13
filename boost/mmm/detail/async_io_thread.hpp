@@ -20,7 +20,7 @@
 #include <boost/mmm/detail/thread.hpp>
 
 #include <algorithm>
-#include <utility>
+#include <boost/tuple/tuple.hpp>
 #include <boost/iterator/zip_iterator.hpp>
 #include <boost/system/error_code.hpp>
 #include <boost/mmm/io/detail/poll.hpp>
@@ -64,9 +64,9 @@ class async_io_thread
     struct check_event
     {
         bool
-        operator()(const io::detail::pollfd &pfd, const context_type *)
+        operator()(boost::tuple<const io::detail::pollfd &, const context_type *> pfd)
         {
-            return pfd.revents != 0;
+            return boost::get<0>(pfd).revents != 0;
         }
     }; // struct check_event
 
@@ -81,9 +81,8 @@ class async_io_thread
             const int ret = poll_fds(_m_pfds.data(), _m_pfds.count(), err_code);
             if (!err_code && 0 < ret)
             {
-                using namespace std;
                 typedef
-                  pair<
+                  boost::tuple<
                     typename pollfd_vector::iterator
                   , typename ctxptr_vector::iterator>
                 iterator_pair;
@@ -91,16 +90,17 @@ class async_io_thread
                 // NOTE: Do not move first descrptor, due to contains pipe to
                 // break poller. The range([itr, ends)) contains descrptors:
                 // ready to operate I/O request.
+                using std::partition;
                 zip_iterator<iterator_pair> itr =
                   partition(
-                    ++make_zip_iterator(make_pair(_m_pfds.begin(), _m_ctxptr.begin()))
-                  , make_zip_iterator(make_pair(_m_pfds.end(), _m_ctxptr.end()))
+                    ++make_zip_iterator(boost::make_tuple(_m_pfds.begin(), _m_ctxptr.begin()))
+                  , make_zip_iterator(boost::make_tuple(_m_pfds.end(), _m_ctxptr.end()))
                   , check_event());
 
                 // TODO: collect descrptors
 
-                _m_pfds.erase(itr->first, _m_pfds.end());
-                _m_ctxptr.erase(itr->second, _m_ctxptr.end());
+                _m_pfds.erase(boost::get<0>(itr.get_iterator_tuple()), _m_pfds.end());
+                _m_ctxptr.erase(boost::get<1>(itr.get_iterator_tuple()), _m_ctxptr.end());
             }
         }
     }
