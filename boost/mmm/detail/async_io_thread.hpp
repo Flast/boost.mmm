@@ -78,7 +78,7 @@ class async_io_thread
         while (true)
         {
             using io::detail::poll_fds;
-            const int ret = poll_fds(_m_pfds.data(), _m_pfds.count(), err_code);
+            const int ret = poll_fds(_m_pfds.data(), _m_pfds.size(), err_code);
             if (!err_code && 0 < ret)
             {
                 typedef
@@ -110,7 +110,7 @@ public:
       : _m_th(&async_io_thread::exec, boost::ref(*this))
     {
         // TODO: create a pipe to break poller
-        _m_ctxptr.push_back(0);
+        _m_ctxptr.push_back(static_cast<context_type *>(0));
         BOOST_ASSERT(_m_pfds.size() == 1 && _m_ctxptr.size() == 1);
     }
 
