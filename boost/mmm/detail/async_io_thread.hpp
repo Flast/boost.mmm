@@ -52,6 +52,7 @@
 #endif
 #include <boost/system/error_code.hpp>
 #include <boost/mmm/io/detail/poll.hpp>
+#include <boost/mmm/io/detail/pipe.hpp>
 
 namespace boost { namespace mmm { namespace detail {
 
@@ -73,6 +74,7 @@ class async_io_thread
     BOOST_MOVABLE_BUT_NOT_COPYABLE(async_io_thread)
 
     typedef io::detail::pollfd pollfd;
+    typedef io::detail::pipefd pipefd;
 
     typedef Context context_type;
     typedef Alloc allocator_type;
@@ -98,10 +100,6 @@ class async_io_thread
 
     typedef container::vector<context_type *, ctxptr_alloc_type> ctxptr_vector;
     typedef container::vector<pollfd, pfd_alloc_type> pollfd_vector;
-
-    thread        _m_th;
-    ctxptr_vector _m_ctxptr;
-    pollfd_vector _m_pfds;
 
     struct check_event
     {
@@ -150,7 +148,13 @@ public:
     async_io_thread()
       : _m_th(&async_io_thread::exec, boost::ref(*this))
     {
-        // TODO: create a pipe to break poller
+        const pollfd pipefd =
+        {
+          /*.fd      =*/ _m_pipe.get<pipefd::read_tag>()
+        , /*.events  =*/ io::detail::polling_events::in
+        , /*.revents =*/ 0
+        };
+        _m_pfds.push_back(pipefd);
         _m_ctxptr.push_back(static_cast<context_type *>(0));
         BOOST_ASSERT(_m_pfds.size() == 1 && _m_ctxptr.size() == 1);
     }
@@ -177,6 +181,12 @@ public:
         swap(_m_th  , other._m_th);
         swap(_m_pfds, other._m_pfds);
     }
+
+private:
+    thread        _m_th;
+    ctxptr_vector _m_ctxptr;
+    pollfd_vector _m_pfds;
+    pipefd        _m_pipe;
 }; // template class async_io_thread
 
 template <typename C, typename A>
