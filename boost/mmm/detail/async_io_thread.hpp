@@ -23,9 +23,10 @@
 #if !defined(BOOST_MMM_ZIP_ITERATOR_IS_A_INPUT_ITERATOR_CATEGORY)
 #include <boost/tuple/tuple.hpp>
 #include <boost/iterator/zip_iterator.hpp>
+#include <boost/fusion/include/boost_tuple.hpp>
+#include <boost/fusion/include/at.hpp>
 #define BOOST_MMM_TUPLE ::boost::tuple
 #define boost_mmm_make_tuple ::boost::make_tuple
-#define boost_mmm_get ::boost::get
 #else
 #include <cstddef>
 #include <iterator>
@@ -48,8 +49,8 @@
 #include <boost/type_traits/is_convertible.hpp>
 #define BOOST_MMM_TUPLE ::boost::fusion::vector
 #define boost_mmm_make_tuple ::boost::fusion::make_vector
-#define boost_mmm_get ::boost::fusion::at_c
 #endif
+
 #include <boost/system/error_code.hpp>
 #include <boost/mmm/io/detail/poll.hpp>
 #include <boost/mmm/io/detail/pipe.hpp>
@@ -106,7 +107,7 @@ class async_io_thread
         bool
         operator()(BOOST_MMM_TUPLE<const pollfd &, const context_type *> pfd)
         {
-            return boost_mmm_get<0>(pfd).revents != 0;
+            return fusion::at_c<0>(pfd).revents != 0;
         }
     }; // struct check_event
 
@@ -138,8 +139,9 @@ class async_io_thread
 
                 // TODO: collect descrptors
 
-                _m_pfds.erase(boost_mmm_get<0>(itr.get_iterator_tuple()), _m_pfds.end());
-                _m_ctxptr.erase(boost_mmm_get<1>(itr.get_iterator_tuple()), _m_ctxptr.end());
+                _m_pfds.erase(fusion::at_c<0>(itr.get_iterator_tuple()), _m_pfds.end());
+                _m_ctxptr.erase(fusion::at_c<1>(itr.get_iterator_tuple()), _m_ctxptr.end());
+                }
             }
         }
     }
@@ -370,7 +372,6 @@ operator==(
 
 } } } // namespace boost::mmm::detail
 
-#undef boost_mmm_get
 #undef boost_mmm_make_tuple
 #undef BOOST_MMM_TUPLE
 
