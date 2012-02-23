@@ -35,6 +35,28 @@ struct scheduler_traits
         return _m_scheduler.get()._m_data->users;
     }
 
+    /**
+     * <b>Effects</b>: Get scheduler locking object.
+     *
+     * <b>Returns</b>: Locking object.
+     */
+    unique_lock<mutex>
+    get_lock() const
+    {
+        return move(unique_lock<mutex>(_m_scheduler.get()._m_data->mtx));
+    }
+
+    /**
+     * <b>Effects</b>: Get scheduler locking object.
+     *
+     * <b>Returns</b>: Locking object.
+     */
+    template <typename LockType>
+    unique_lock<mutex>
+    get_lock(const LockType &lt) const
+    {
+        return move(unique_lock<mutex>(_m_scheduler.get()._m_data->mtx, lt));
+    }
 private:
     boost::reference_wrapper<scheduler_type> _m_scheduler;
 }; // template struct scheduler_traits

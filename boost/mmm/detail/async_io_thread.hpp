@@ -19,6 +19,11 @@
 
 #include <boost/mmm/detail/thread.hpp>
 
+#include <boost/phoenix/core.hpp>
+#include <boost/phoenix/operator/self.hpp>
+#include <boost/phoenix/bind/bind_member_function.hpp>
+#include <boost/phoenix/fusion/at.hpp>
+
 #include <algorithm>
 #if !defined(BOOST_MMM_ZIP_ITERATOR_IS_A_INPUT_ITERATOR_CATEGORY)
 #include <boost/tuple/tuple.hpp>
@@ -111,8 +116,9 @@ class async_io_thread
         }
     }; // struct check_event
 
+    template <typename SchedulerTraits, typename StrategyTraits>
     void
-    exec()
+    exec(SchedulerTraits scheduler_traits, StrategyTraits strategy_traits)
     {
         system::error_code err_code;
         // TODO: check terminate flag
@@ -128,27 +134,42 @@ class async_io_thread
                   , typename ctxptr_vector::iterator>
                 iterator_pair;
 
+                const zip_iterator<iterator_pair> zipend(
+                  boost_mmm_make_tuple(_m_pfds.end(), _m_ctxptr.end()));
+
                 // NOTE: Do not move first descrptor, due to contains pipe to
                 // break poller. The range([itr, ends)) contains descrptors:
                 // ready to operate I/O request.
                 zip_iterator<iterator_pair> itr =
                   std::partition(
                     ++make_zip_iterator(boost_mmm_make_tuple(_m_pfds.begin(), _m_ctxptr.begin()))
-                  , make_zip_iterator(boost_mmm_make_tuple(_m_pfds.end(), _m_ctxptr.end()))
+                  , zipend
                   , check_event());
 
-                // TODO: collect descrptors
+                if (itr != zipend)
+                {
+                    unique_lock<mutex> guard(scheduler_traits.get_lock());
 
-                _m_pfds.erase(fusion::at_c<0>(itr.get_iterator_tuple()), _m_pfds.end());
-                _m_ctxptr.erase(fusion::at_c<1>(itr.get_iterator_tuple()), _m_ctxptr.end());
+                    std::for_each(itr, zipend
+                    , phoenix::bind(
+                        &StrategyTraits::push_ctx
+                      , boost::ref(strategy_traits)
+                      , boost::ref(scheduler_traits)
+                      , *phoenix::at_c<1>(phoenix::placeholders::arg1)));
+
+                    _m_pfds.erase(fusion::at_c<0>(itr.get_iterator_tuple()), _m_pfds.end());
+                    _m_ctxptr.erase(fusion::at_c<1>(itr.get_iterator_tuple()), _m_ctxptr.end());
                 }
             }
         }
     }
 
 public:
-    async_io_thread()
-      : _m_th(&async_io_thread::exec, boost::ref(*this))
+    template <typename SchedulerTraits, typename StrategyTraits>
+    explicit
+    async_io_thread(SchedulerTraits scheduler_traits, StrategyTraits strategy_traits)
+      : _m_th(&exec<SchedulerTraits, StrategyTraits>, boost::ref(*this)
+        , scheduler_traits, strategy_traits)
     {
         const pollfd pipefd =
         {
