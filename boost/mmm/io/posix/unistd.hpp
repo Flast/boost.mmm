@@ -15,6 +15,8 @@
 #include <boost/mmm/detail/context.hpp>
 #include <boost/mmm/detail/current_context.hpp>
 #include <boost/mmm/io/detail/poll.hpp>
+#include <boost/mmm/io/detail/check_events.hpp>
+#include <boost/system/error_code.hpp>
 
 #include <unistd.h>
 
@@ -55,8 +57,14 @@ struct read_impl
     {
         using fusion::at_c;
         data &rd = *static_cast<data *>(d->data);
-        at_c<0>(rd) = ::read(d->fd, at_c<1>(rd), at_c<2>(rd));
+        at_c<0>(rd) = call(d->fd, at_c<1>(rd), at_c<2>(rd));
         return NULL;
+    }
+
+    static ssize_t
+    call(int fd, void *buf, std::size_t count)
+    {
+        return ::read(fd, buf, count);
     }
 }; // struct read_impl
 
@@ -67,13 +75,18 @@ struct read_impl
 inline ssize_t
 read(int fd, void *buf, std::size_t count)
 {
-    if (count == 0) { return ::read(fd, buf, count); }
-
     using namespace detail;
-    using io::detail::polling_events;
+    using io::detail::check_events;
+    const int in = io::detail::polling_events::in;
+
+    system::error_code unused;
+    if (count == 0 || check_events(fd, in, unused) & in)
+    {
+        return read_impl::call(fd, buf, count);
+    }
 
     read_impl::data rd(0, buf, count);
-    return yield_blocker_syscall<read_impl>(fd, polling_events::in, rd);
+    return yield_blocker_syscall<read_impl>(fd, in, rd);
 }
 
 namespace detail {
@@ -87,8 +100,14 @@ struct write_impl
     {
         using fusion::at_c;
         data &rd = *static_cast<data *>(d->data);
-        at_c<0>(rd) = ::write(d->fd, at_c<1>(rd), at_c<2>(rd));
+        at_c<0>(rd) = call(d->fd, at_c<1>(rd), at_c<2>(rd));
         return NULL;
+    }
+
+    static ssize_t
+    call(int fd, const void *buf, std::size_t count)
+    {
+        return ::write(fd, buf, count);
     }
 }; // struct write_impl
 
@@ -100,9 +119,17 @@ inline ssize_t
 write(int fd, const void *buf, std::size_t count)
 {
     using namespace detail;
-    using io::detail::polling_events;
+    using io::detail::check_events;
+    const int out = io::detail::polling_events::out;
+
+    system::error_code unused;
+    if (check_events(fd, out, unused) & out)
+    {
+        return write_impl::call(fd, buf, count);
+    }
+
     write_impl::data rd(0, buf, count);
-    return yield_blocker_syscall<write_impl>(fd, polling_events::out, rd);
+    return yield_blocker_syscall<write_impl>(fd, out, rd);
 }
 
 } } } } // namespace boost::mmm:io::posix
