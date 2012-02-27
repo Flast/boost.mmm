@@ -151,16 +151,29 @@ class async_io_thread
 
                 if (itr != zipend)
                 {
-                    unique_lock<mutex> guard(scheduler_traits.get_lock());
+                    {
+                        unique_lock<mutex> guard(scheduler_traits.get_lock());
 
-                    typedef void (StrategyTraits::*push_ctx)(SchedulerTraits, context_type);
-                    std::for_each(itr, zipend
+                        typedef void (StrategyTraits::*push_ctx)(SchedulerTraits, context_type);
+                        // Restore I/O ready contexts to schedular.
+                        std::for_each(itr, zipend
+                        , phoenix::bind(
+                            static_cast<push_ctx>(&StrategyTraits::push_ctx)
+                          , boost::ref(strategy_traits)
+                          , boost::ref(scheduler_traits)
+                          , phoenix::move(
+                              *phoenix::at_c<1>(phoenix::placeholders::arg1))));
+                    }
+
+                    typedef typename ctxact_vector::iterator       ctxact_iterator;
+                    typedef typename ctxact_vector::const_iterator ctxact_const_iterator;
+                    typedef ctxact_iterator (ctxact_vector::*eraser)(ctxact_const_iterator);
+                    // Erase resotred contexts.
+                    std::for_each(fusion::at_c<1>(itr.get_iterator_tuple()), _m_ctxitr.end()
                     , phoenix::bind(
-                        static_cast<push_ctx>(&StrategyTraits::push_ctx)
-                      , boost::ref(strategy_traits)
-                      , boost::ref(scheduler_traits)
-                      , phoenix::move(*phoenix::at_c<1>(phoenix::placeholders::arg1))));
-
+                        static_cast<eraser>(&ctxact_vector::erase)
+                      , boost::ref(_m_ctxact)
+                      , phoenix::placeholders::arg1));
                     _m_pfds.erase(fusion::at_c<0>(itr.get_iterator_tuple()), _m_pfds.end());
                     _m_ctxitr.erase(fusion::at_c<1>(itr.get_iterator_tuple()), _m_ctxitr.end());
                 }
