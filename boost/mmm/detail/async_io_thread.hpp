@@ -65,13 +65,6 @@ namespace boost { namespace mmm { namespace detail {
 #if defined(BOOST_MMM_ZIP_ITERATOR_IS_A_INPUT_ITERATOR_CATEGORY)
 template <typename IteratorTuple>
 struct zip_iterator;
-
-template <typename IteratorTuple>
-inline zip_iterator<IteratorTuple>
-make_zip_iterator(IteratorTuple t)
-{
-    return zip_iterator<IteratorTuple>(t);
-}
 #endif
 
 template <typename Context, typename Alloc>
@@ -134,15 +127,15 @@ class async_io_thread
                   , typename ctxptr_vector::iterator>
                 iterator_pair;
 
-                const zip_iterator<iterator_pair> zipend(
-                  boost_mmm_make_tuple(_m_pfds.end(), _m_ctxptr.end()));
+                typedef zip_iterator<iterator_pair> zipitr;
+                const zipitr zipend(boost_mmm_make_tuple(_m_pfds.end(), _m_ctxptr.end()));
 
                 // NOTE: Do not move first descrptor, due to contains pipe to
                 // break poller. The range([itr, ends)) contains descrptors:
                 // ready to operate I/O request.
                 zip_iterator<iterator_pair> itr =
                   std::partition(
-                    ++make_zip_iterator(boost_mmm_make_tuple(_m_pfds.begin(), _m_ctxptr.begin()))
+                    ++zipitr(boost_mmm_make_tuple(_m_pfds.begin(), _m_ctxptr.begin()))
                   , zipend
                   , check_event());
 
@@ -150,9 +143,10 @@ class async_io_thread
                 {
                     unique_lock<mutex> guard(scheduler_traits.get_lock());
 
+                    typedef void (StrategyTraits::*push_ctx)(SchedulerTraits, context_type);
                     std::for_each(itr, zipend
                     , phoenix::bind(
-                        &StrategyTraits::push_ctx
+                        static_cast<push_ctx>(&StrategyTraits::push_ctx)
                       , boost::ref(strategy_traits)
                       , boost::ref(scheduler_traits)
                       , *phoenix::at_c<1>(phoenix::placeholders::arg1)));
@@ -168,7 +162,7 @@ public:
     template <typename SchedulerTraits, typename StrategyTraits>
     explicit
     async_io_thread(SchedulerTraits scheduler_traits, StrategyTraits strategy_traits)
-      : _m_th(&exec<SchedulerTraits, StrategyTraits>, boost::ref(*this)
+      : _m_th(&async_io_thread::exec<SchedulerTraits, StrategyTraits>, boost::ref(*this)
         , scheduler_traits, strategy_traits)
     {
         const pollfd pipefd =
@@ -186,6 +180,12 @@ public:
       : _m_th(move(other._m_th))
       , _m_pfds(move(other._m_pfds)) {}
 
+    ~async_io_thread()
+    {
+        _m_pipe.close<pipefd::read_tag>();
+        _m_th.join();
+    }
+
     async_io_thread &
     operator=(BOOST_RV_REF(async_io_thread) other)
     {
@@ -193,9 +193,6 @@ public:
         _m_pfds = move(other._m_pfds);
         return *this;
     }
-
-    void
-    join() { _m_th.join(); }
 
     void
     swap(async_io_thread &other)
@@ -389,6 +386,14 @@ operator==(
     , fusion::make_fused(equal()));
 }
 
+template <typename IteratorTupleL, typename IteratorTupleR>
+inline bool
+operator!=(
+  const zip_iterator<IteratorTupleL> &l
+, const zip_iterator<IteratorTupleR> &r)
+{
+    return !(l == r);
+}
 #endif
 
 } } } // namespace boost::mmm::detail
