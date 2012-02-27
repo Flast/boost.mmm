@@ -16,6 +16,7 @@
 #include <boost/container/allocator/allocator_traits.hpp>
 #endif
 #include <boost/container/vector.hpp>
+#include <boost/container/list.hpp>
 
 #include <boost/mmm/detail/thread.hpp>
 
@@ -84,11 +85,21 @@ class async_io_thread
 
     typedef
 #if !defined(BOOST_MMM_CONTAINER_HAS_NO_ALLOCATOR_TRAITS)
-      typename allocator_traits::template rebind_alloc<context_type *>
+      typename allocator_traits::template rebind_alloc<context_type>
 #else
-      typename allocator_type::template rebind<context_type *>::other
+      typename allocator_type::template rebind<context_type>::other
 #endif
-    ctxptr_alloc_type;
+    ctxact_alloc_type;
+    typedef container::list<context_type, ctxact_alloc_type> ctxact_vector;
+
+    typedef
+#if !defined(BOOST_MMM_CONTAINER_HAS_NO_ALLOCATOR_TRAITS)
+      typename allocator_traits::template rebind_alloc<typename ctxact_vector::iterator>
+#else
+      typename allocator_type::template rebind<typename ctxact_vector::iterator>::other
+#endif
+    ctxitr_alloc_type;
+    typedef container::vector<typename ctxact_vector::iterator, ctxitr_alloc_type> ctxitr_vector;
 
     typedef
 #if !defined(BOOST_MMM_CONTAINER_HAS_NO_ALLOCATOR_TRAITS)
@@ -97,14 +108,12 @@ class async_io_thread
       typename allocator_type::template rebind<pollfd>::other
 #endif
     pfd_alloc_type;
-
-    typedef container::vector<context_type *, ctxptr_alloc_type> ctxptr_vector;
     typedef container::vector<pollfd, pfd_alloc_type> pollfd_vector;
 
     struct check_event
     {
         bool
-        operator()(BOOST_MMM_TUPLE<const pollfd &, const context_type *> pfd)
+        operator()(BOOST_MMM_TUPLE<const pollfd &, typename ctxact_vector::iterator> pfd)
         {
             return fusion::at_c<0>(pfd).revents != 0;
         }
@@ -125,18 +134,18 @@ class async_io_thread
                 typedef
                   BOOST_MMM_TUPLE<
                     typename pollfd_vector::iterator
-                  , typename ctxptr_vector::iterator>
+                  , typename ctxitr_vector::iterator>
                 iterator_pair;
 
                 typedef zip_iterator<iterator_pair> zipitr;
-                const zipitr zipend(boost_mmm_make_tuple(_m_pfds.end(), _m_ctxptr.end()));
+                const zipitr zipend(boost_mmm_make_tuple(_m_pfds.end(), _m_ctxitr.end()));
 
                 // NOTE: Do not move first descrptor, due to contains pipe to
                 // break poller. The range([itr, ends)) contains descrptors:
                 // ready to operate I/O request.
                 zip_iterator<iterator_pair> itr =
                   std::partition(
-                    ++zipitr(boost_mmm_make_tuple(_m_pfds.begin(), _m_ctxptr.begin()))
+                    ++zipitr(boost_mmm_make_tuple(_m_pfds.begin(), _m_ctxitr.begin()))
                   , zipend
                   , check_event());
 
@@ -153,7 +162,7 @@ class async_io_thread
                       , phoenix::move(*phoenix::at_c<1>(phoenix::placeholders::arg1))));
 
                     _m_pfds.erase(fusion::at_c<0>(itr.get_iterator_tuple()), _m_pfds.end());
-                    _m_ctxptr.erase(fusion::at_c<1>(itr.get_iterator_tuple()), _m_ctxptr.end());
+                    _m_ctxitr.erase(fusion::at_c<1>(itr.get_iterator_tuple()), _m_ctxitr.end());
                 }
             }
         }
@@ -173,8 +182,8 @@ public:
         , /*.revents =*/ 0
         };
         _m_pfds.push_back(pipefd);
-        _m_ctxptr.push_back(static_cast<context_type *>(0));
-        BOOST_ASSERT(_m_pfds.size() == 1 && _m_ctxptr.size() == 1);
+        _m_ctxitr.push_back(typename ctxact_vector::iterator());
+        BOOST_ASSERT(_m_pfds.size() == 1 && _m_ctxitr.size() == 1);
     }
 
     async_io_thread(BOOST_RV_REF(async_io_thread) other)
@@ -205,7 +214,8 @@ public:
 
 private:
     thread        _m_th;
-    ctxptr_vector _m_ctxptr;
+    ctxact_vector _m_ctxact;
+    ctxitr_vector _m_ctxitr;
     pollfd_vector _m_pfds;
     pipefd        _m_pipe;
 }; // template class async_io_thread
