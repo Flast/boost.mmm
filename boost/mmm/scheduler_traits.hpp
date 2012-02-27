@@ -12,6 +12,9 @@
 #include <boost/ref.hpp>
 #include <boost/assert.hpp>
 
+#include <boost/thread/mutex.hpp>
+#include <boost/mmm/detail/locks.hpp>
+
 namespace boost { namespace mmm {
 
 template <typename Scheduler>
@@ -43,7 +46,7 @@ struct scheduler_traits
     unique_lock<mutex>
     get_lock() const
     {
-        return move(unique_lock<mutex>(_m_scheduler.get()._m_data->mtx));
+        return unique_lock<mutex>(_m_scheduler.get()._m_data->mtx);
     }
 
     /**
@@ -55,7 +58,7 @@ struct scheduler_traits
     unique_lock<mutex>
     get_lock(const LockType &lt) const
     {
-        return move(unique_lock<mutex>(_m_scheduler.get()._m_data->mtx, lt));
+        return unique_lock<mutex>(_m_scheduler.get()._m_data->mtx, lt);
     }
 private:
     boost::reference_wrapper<scheduler_type> _m_scheduler;

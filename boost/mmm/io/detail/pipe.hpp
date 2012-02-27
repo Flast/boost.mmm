@@ -17,11 +17,15 @@
 #include <boost/utility/enable_if.hpp>
 #include <boost/type_traits/is_convertible.hpp>
 
+#include <boost/utility/swap.hpp>
+#include <boost/mmm/detail/move.hpp>
+
 namespace boost { namespace mmm { namespace io { namespace detail {
 
-struct pipefd
+class pipefd
 {
-private:
+    BOOST_MOVABLE_BUT_NOT_COPYABLE(pipefd)
+
     struct pipe_tag {};
 
 public:
@@ -43,10 +47,31 @@ public:
         }
     }
 
+    pipefd(BOOST_RV_REF(pipefd) other)
+    {
+        _m_pipe[0] = other._m_pipe[0];
+        _m_pipe[1] = other._m_pipe[1];
+        other._m_pipe[0] = -1;
+        other._m_pipe[1] = -1;
+    }
+
     ~pipefd()
     {
         close<read_tag>();
         close<write_tag>();
+    }
+
+    pipefd &
+    operator=(BOOST_RV_REF(pipefd) other)
+    {
+        pipefd(move(other)).swap(*this);
+        return *this;
+    }
+
+    void
+    swap(pipefd &other)
+    {
+        boost::swap(_m_pipe, other._m_pipe);
     }
 
     template <typename Tag>
@@ -68,6 +93,12 @@ public:
 private:
     int _m_pipe[2];
 }; // struct pipefd
+
+inline void
+swap(pipefd &l, pipefd &r)
+{
+    l.swap(r);
+}
 
 } } } } // namespace boost::mmm::io::detail
 

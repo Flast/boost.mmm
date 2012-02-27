@@ -188,7 +188,10 @@ public:
 
     async_io_thread(BOOST_RV_REF(async_io_thread) other)
       : _m_th(move(other._m_th))
-      , _m_pfds(move(other._m_pfds)) {}
+      , _m_ctxact(move(other._m_ctxact))
+      , _m_ctxitr(move(other._m_ctxitr))
+      , _m_pfds(move(other._m_pfds))
+      , _m_pipe(move(other._m_pipe)) {}
 
     ~async_io_thread()
     {
@@ -199,8 +202,7 @@ public:
     async_io_thread &
     operator=(BOOST_RV_REF(async_io_thread) other)
     {
-        _m_th   = move(other._m_th);
-        _m_pfds = move(other._m_pfds);
+        async_io_thread(move(other)).swap(*this);
         return *this;
     }
 
@@ -208,8 +210,11 @@ public:
     swap(async_io_thread &other)
     {
         using std::swap;
-        swap(_m_th  , other._m_th);
-        swap(_m_pfds, other._m_pfds);
+        swap(_m_th    , other._m_th    );
+        swap(_m_ctxact, other._m_ctxact);
+        swap(_m_ctxitr, other._m_ctxitr);
+        swap(_m_pfds  , other._m_pfds  );
+        swap(_m_pipe  , other._m_pipe  );
     }
 
 private:
