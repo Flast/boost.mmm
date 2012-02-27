@@ -23,6 +23,7 @@
 #include <boost/phoenix/operator/self.hpp>
 #include <boost/phoenix/bind/bind_member_function.hpp>
 #include <boost/phoenix/fusion/at.hpp>
+#include <boost/mmm/detail/phoenix/move.hpp>
 
 #include <algorithm>
 #if !defined(BOOST_MMM_ZIP_ITERATOR_IS_A_INPUT_ITERATOR_CATEGORY)
@@ -149,7 +150,7 @@ class async_io_thread
                         static_cast<push_ctx>(&StrategyTraits::push_ctx)
                       , boost::ref(strategy_traits)
                       , boost::ref(scheduler_traits)
-                      , *phoenix::at_c<1>(phoenix::placeholders::arg1)));
+                      , phoenix::move(*phoenix::at_c<1>(phoenix::placeholders::arg1))));
 
                     _m_pfds.erase(fusion::at_c<0>(itr.get_iterator_tuple()), _m_pfds.end());
                     _m_ctxptr.erase(fusion::at_c<1>(itr.get_iterator_tuple()), _m_ctxptr.end());
