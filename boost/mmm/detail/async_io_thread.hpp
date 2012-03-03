@@ -135,15 +135,15 @@ class async_io_thread
                   BOOST_MMM_TUPLE<
                     typename pollfd_vector::iterator
                   , typename ctxitr_vector::iterator>
-                iterator_pair;
+                iterator_tuple;
 
-                typedef zip_iterator<iterator_pair> zipitr;
+                typedef zip_iterator<iterator_tuple> zipitr;
                 const zipitr zipend(boost_mmm_make_tuple(_m_pfds.end(), _m_ctxitr.end()));
 
                 // NOTE: Do not move first descrptor, due to contains pipe to
                 // break poller. The range([itr, ends)) contains descrptors:
                 // ready to operate I/O request.
-                zip_iterator<iterator_pair> itr =
+                zip_iterator<iterator_tuple> itr =
                   std::partition(
                     ++zipitr(boost_mmm_make_tuple(_m_pfds.begin(), _m_ctxitr.begin()))
                   , zipend
@@ -151,34 +151,48 @@ class async_io_thread
 
                 if (itr != zipend)
                 {
-                    {
-                        unique_lock<mutex> guard(scheduler_traits.get_lock());
-
-                        typedef void (StrategyTraits::*push_ctx)(SchedulerTraits, context_type);
-                        // Restore I/O ready contexts to schedular.
-                        std::for_each(itr, zipend
-                        , phoenix::bind(
-                            static_cast<push_ctx>(&StrategyTraits::push_ctx)
-                          , boost::ref(strategy_traits)
-                          , boost::ref(scheduler_traits)
-                          , phoenix::move(
-                              *phoenix::at_c<1>(phoenix::placeholders::arg1))));
-                    }
-
-                    typedef typename ctxact_vector::iterator       ctxact_iterator;
-                    typedef typename ctxact_vector::const_iterator ctxact_const_iterator;
-                    typedef ctxact_iterator (ctxact_vector::*eraser)(ctxact_const_iterator);
-                    // Erase resotred contexts.
-                    std::for_each(fusion::at_c<1>(itr.get_iterator_tuple()), _m_ctxitr.end()
-                    , phoenix::bind(
-                        static_cast<eraser>(&ctxact_vector::erase)
-                      , boost::ref(_m_ctxact)
-                      , phoenix::placeholders::arg1));
-                    _m_pfds.erase(fusion::at_c<0>(itr.get_iterator_tuple()), _m_pfds.end());
-                    _m_ctxitr.erase(fusion::at_c<1>(itr.get_iterator_tuple()), _m_ctxitr.end());
+                    restore_and_erase<iterator_tuple>(
+                      strategy_traits, scheduler_traits, itr, zipend);
                 }
             }
         }
+    }
+
+    template <typename IteratorTuple, typename StrategyTraits
+    , typename SchedulerTraits, typename ZipIterator>
+    void
+    restore_and_erase(StrategyTraits &strategy_traits
+    , SchedulerTraits &scheduler_traits, ZipIterator itr, ZipIterator end)
+    {
+        {
+            unique_lock<mutex> guard(scheduler_traits.get_lock());
+
+            typedef void (StrategyTraits::*push_ctx)(SchedulerTraits, context_type);
+            // Restore I/O ready contexts to schedular.
+            std::for_each(itr, end
+            , phoenix::bind(
+                static_cast<push_ctx>(&StrategyTraits::push_ctx)
+              , boost::ref(strategy_traits)
+              , boost::ref(scheduler_traits)
+              , phoenix::move(
+                  *phoenix::at_c<1>(phoenix::placeholders::arg1))));
+        }
+
+        IteratorTuple &itr_tuple = itr.get_iterator_tuple(),
+                      &end_tuple = end.get_iterator_tuple();
+
+        typedef typename ctxact_vector::iterator       ctxact_iterator;
+        typedef typename ctxact_vector::const_iterator ctxact_const_iterator;
+        typedef ctxact_iterator (ctxact_vector::*eraser)(ctxact_const_iterator);
+        // Erase resotred contexts.
+        std::for_each(
+          fusion::at_c<1>(itr_tuple), fusion::at_c<1>(end_tuple)
+        , phoenix::bind(
+            static_cast<eraser>(&ctxact_vector::erase)
+          , boost::ref(_m_ctxact)
+          , phoenix::placeholders::arg1));
+        _m_pfds.erase(fusion::at_c<0>(itr_tuple), fusion::at_c<0>(end_tuple));
+        _m_ctxitr.erase(fusion::at_c<1>(itr_tuple), fusion::at_c<1>(end_tuple));
     }
 
 public:
