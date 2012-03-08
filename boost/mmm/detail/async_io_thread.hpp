@@ -58,15 +58,23 @@
 #define boost_mmm_make_tuple ::boost::fusion::make_vector
 #endif
 
+#include <boost/atomic.hpp>
+#include <boost/chrono/duration.hpp>
 #include <boost/system/error_code.hpp>
 #include <boost/mmm/io/detail/poll.hpp>
-#include <boost/mmm/io/detail/pipe.hpp>
 
 namespace boost { namespace mmm { namespace detail {
 
 #if defined(BOOST_MMM_ZIP_ITERATOR_IS_A_INPUT_ITERATOR_CATEGORY)
 template <typename IteratorTuple>
 struct zip_iterator;
+
+template <typename IteratorTuple>
+inline zip_iterator<IteratorTuple>
+make_zip_iterator(IteratorTuple iterator_tuple)
+{
+    return zip_iterator<IteratorTuple>(iterator_tuple);
+}
 #endif
 
 template <typename Context, typename Alloc>
@@ -75,7 +83,6 @@ class async_io_thread
     BOOST_MOVABLE_BUT_NOT_COPYABLE(async_io_thread)
 
     typedef io::detail::pollfd pollfd;
-    typedef io::detail::pipefd pipefd;
 
     typedef Context context_type;
     typedef Alloc allocator_type;
@@ -124,11 +131,11 @@ class async_io_thread
     exec(SchedulerTraits scheduler_traits, StrategyTraits strategy_traits)
     {
         system::error_code err_code;
-        // TODO: check terminate flag
-        while (true)
+        while (!_m_terminate)
         {
             using io::detail::poll_fds;
-            const int ret = poll_fds(_m_pfds.data(), _m_pfds.size(), err_code);
+            const int ret = poll_fds(_m_pfds.data(), _m_pfds.size(), chrono::milliseconds(10), err_code);
+
             if (!err_code && 0 < ret)
             {
                 typedef
@@ -140,46 +147,51 @@ class async_io_thread
                 typedef zip_iterator<iterator_tuple> zipitr;
                 const zipitr zipend(boost_mmm_make_tuple(_m_pfds.end(), _m_ctxitr.end()));
 
-                // NOTE: Do not move first descrptor, due to contains pipe to
-                // break poller. The range([itr, ends)) contains descrptors:
-                // ready to operate I/O request.
                 zip_iterator<iterator_tuple> itr =
                   std::partition(
-                    ++zipitr(boost_mmm_make_tuple(_m_pfds.begin(), _m_ctxitr.begin()))
+                    zipitr(boost_mmm_make_tuple(_m_pfds.begin(), _m_ctxitr.begin()))
                   , zipend
                   , check_event());
 
                 if (itr != zipend)
                 {
-                    restore_and_erase<iterator_tuple>(
-                      strategy_traits, scheduler_traits, itr, zipend);
+                    restore_contexts(strategy_traits, scheduler_traits, itr, zipend);
+                    erase<iterator_tuple>(itr, zipend);
                 }
             }
         }
+
+        // Cleanup all remained contexts.
+        restore_contexts(
+          strategy_traits, scheduler_traits
+        , make_zip_iterator(boost_mmm_make_tuple(_m_pfds.begin(), _m_ctxitr.begin()))
+        , make_zip_iterator(boost_mmm_make_tuple(_m_pfds.end(), _m_ctxitr.end())));
     }
 
-    template <typename IteratorTuple, typename StrategyTraits
-    , typename SchedulerTraits, typename ZipIterator>
+    template <typename StrategyTraits, typename SchedulerTraits, typename ZipIterator>
     void
-    restore_and_erase(StrategyTraits &strategy_traits
+    restore_contexts(StrategyTraits &strategy_traits
     , SchedulerTraits &scheduler_traits, ZipIterator itr, ZipIterator end)
     {
-        {
-            unique_lock<mutex> guard(scheduler_traits.get_lock());
+        unique_lock<mutex> guard(scheduler_traits.get_lock());
 
-            typedef void (StrategyTraits::*push_ctx)(SchedulerTraits, context_type);
-            // Restore I/O ready contexts to schedular.
-            std::for_each(itr, end
-            , phoenix::bind(
-                static_cast<push_ctx>(&StrategyTraits::push_ctx)
-              , boost::ref(strategy_traits)
-              , boost::ref(scheduler_traits)
-              , phoenix::move(
-                  *phoenix::at_c<1>(phoenix::placeholders::arg1))));
-        }
+        typedef void (StrategyTraits::*push_ctx)(SchedulerTraits, context_type);
+        // Restore I/O ready contexts to schedular.
+        std::for_each(itr, end
+        , phoenix::bind(
+            static_cast<push_ctx>(&StrategyTraits::push_ctx)
+          , boost::ref(strategy_traits)
+          , boost::ref(scheduler_traits)
+          , phoenix::move(
+              *phoenix::at_c<1>(phoenix::placeholders::arg1))));
+    }
 
-        IteratorTuple &itr_tuple = itr.get_iterator_tuple(),
-                      &end_tuple = end.get_iterator_tuple();
+    template <typename IteratorTuple, typename ZipIterator>
+    void
+    erase(ZipIterator itr, ZipIterator end)
+    {
+        const IteratorTuple &itr_tuple = itr.get_iterator_tuple(),
+                            &end_tuple = end.get_iterator_tuple();
 
         typedef typename ctxact_vector::iterator       ctxact_iterator;
         typedef typename ctxact_vector::const_iterator ctxact_const_iterator;
@@ -199,30 +211,19 @@ public:
     template <typename SchedulerTraits, typename StrategyTraits>
     explicit
     async_io_thread(SchedulerTraits scheduler_traits, StrategyTraits strategy_traits)
-      : _m_th(&async_io_thread::exec<SchedulerTraits, StrategyTraits>, boost::ref(*this)
-        , scheduler_traits, strategy_traits)
-    {
-        const pollfd pipefd =
-        {
-          /*.fd      =*/ _m_pipe.get<pipefd::read_tag>()
-        , /*.events  =*/ io::detail::polling_events::in
-        , /*.revents =*/ 0
-        };
-        _m_pfds.push_back(pipefd);
-        _m_ctxitr.push_back(typename ctxact_vector::iterator());
-        BOOST_ASSERT(_m_pfds.size() == 1 && _m_ctxitr.size() == 1);
-    }
+      : _m_th(&async_io_thread::exec<SchedulerTraits, StrategyTraits>
+        , boost::ref(*this), scheduler_traits, strategy_traits) {}
 
     async_io_thread(BOOST_RV_REF(async_io_thread) other)
       : _m_th(move(other._m_th))
       , _m_ctxact(move(other._m_ctxact))
       , _m_ctxitr(move(other._m_ctxitr))
       , _m_pfds(move(other._m_pfds))
-      , _m_pipe(move(other._m_pipe)) {}
+      , _m_terminate(false) {}
 
     ~async_io_thread()
     {
-        _m_pipe.close<pipefd::read_tag>();
+        _m_terminate = true;
         _m_th.join();
     }
 
@@ -241,7 +242,6 @@ public:
         swap(_m_ctxact, other._m_ctxact);
         swap(_m_ctxitr, other._m_ctxitr);
         swap(_m_pfds  , other._m_pfds  );
-        swap(_m_pipe  , other._m_pipe  );
     }
 
 private:
@@ -249,7 +249,7 @@ private:
     ctxact_vector _m_ctxact;
     ctxitr_vector _m_ctxitr;
     pollfd_vector _m_pfds;
-    pipefd        _m_pipe;
+    atomic<bool>  _m_terminate;
 }; // template class async_io_thread
 
 template <typename C, typename A>
@@ -291,7 +291,7 @@ template <typename IteratorTuple>
 struct zip_iterator_base
 {
 private:
-    // This implementation is not for generic usage.
+    // XXX: This implementation is not for generic usage.
     typedef std::random_access_iterator_tag category;
     typedef boost::random_access_traversal_tag traversal;
 
