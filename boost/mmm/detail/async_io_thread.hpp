@@ -10,7 +10,7 @@
 
 #include <boost/assert.hpp>
 #include <boost/ref.hpp>
-#include <boost/mmm/detail/move.hpp>
+#include <boost/noncopyable.hpp>
 
 #if !defined(BOOST_MMM_CONTAINER_HAS_NO_ALLOCATOR_TRAITS)
 #include <boost/container/allocator/allocator_traits.hpp>
@@ -78,10 +78,8 @@ make_zip_iterator(IteratorTuple iterator_tuple)
 #endif
 
 template <typename Context, typename Alloc>
-class async_io_thread
+class async_io_thread : private noncopyable
 {
-    BOOST_MOVABLE_BUT_NOT_COPYABLE(async_io_thread)
-
     typedef io::detail::pollfd pollfd;
 
     typedef Context context_type;
@@ -212,36 +210,13 @@ public:
     explicit
     async_io_thread(SchedulerTraits scheduler_traits, StrategyTraits strategy_traits)
       : _m_th(&async_io_thread::exec<SchedulerTraits, StrategyTraits>
-        , boost::ref(*this), scheduler_traits, strategy_traits) {}
-
-    async_io_thread(BOOST_RV_REF(async_io_thread) other)
-      : _m_th(move(other._m_th))
-      , _m_ctxact(move(other._m_ctxact))
-      , _m_ctxitr(move(other._m_ctxitr))
-      , _m_pfds(move(other._m_pfds))
+        , boost::ref(*this), scheduler_traits, strategy_traits)
       , _m_terminate(false) {}
 
     ~async_io_thread()
     {
         _m_terminate = true;
         _m_th.join();
-    }
-
-    async_io_thread &
-    operator=(BOOST_RV_REF(async_io_thread) other)
-    {
-        async_io_thread(move(other)).swap(*this);
-        return *this;
-    }
-
-    void
-    swap(async_io_thread &other)
-    {
-        using std::swap;
-        swap(_m_th    , other._m_th    );
-        swap(_m_ctxact, other._m_ctxact);
-        swap(_m_ctxitr, other._m_ctxitr);
-        swap(_m_pfds  , other._m_pfds  );
     }
 
 private:
@@ -251,13 +226,6 @@ private:
     pollfd_vector _m_pfds;
     atomic<bool>  _m_terminate;
 }; // template class async_io_thread
-
-template <typename C, typename A>
-inline void
-swap(async_io_thread<C, A> &l, async_io_thread<C, A> &r)
-{
-    l.swap(r);
-}
 
 #if defined(BOOST_MMM_ZIP_ITERATOR_IS_A_INPUT_ITERATOR_CATEGORY)
 struct dereference_iterator
