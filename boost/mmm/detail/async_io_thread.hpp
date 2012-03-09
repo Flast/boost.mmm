@@ -77,12 +77,12 @@ make_zip_iterator(IteratorTuple iterator_tuple)
 }
 #endif
 
-template <typename Context, typename Alloc>
+template <typename SchedulerTraits, typename StrategyTraits, typename Alloc>
 class async_io_thread : private noncopyable
 {
     typedef io::detail::pollfd pollfd;
 
-    typedef Context context_type;
+    typedef typename StrategyTraits::context_type context_type;
     typedef Alloc allocator_type;
 #if !defined(BOOST_MMM_CONTAINER_HAS_NO_ALLOCATOR_TRAITS)
     typedef container::allocator_traits<allocator_type> allocator_traits;
@@ -124,9 +124,8 @@ class async_io_thread : private noncopyable
         }
     }; // struct check_event
 
-    template <typename SchedulerTraits, typename StrategyTraits>
     void
-    exec(SchedulerTraits scheduler_traits, StrategyTraits strategy_traits)
+    exec()
     {
         system::error_code err_code;
         while (!_m_terminate)
@@ -153,7 +152,7 @@ class async_io_thread : private noncopyable
 
                 if (itr != zipend)
                 {
-                    restore_contexts(strategy_traits, scheduler_traits, itr, zipend);
+                    restore_contexts(itr, zipend);
                     erase<iterator_tuple>(itr, zipend);
                 }
             }
@@ -161,25 +160,23 @@ class async_io_thread : private noncopyable
 
         // Cleanup all remained contexts.
         restore_contexts(
-          strategy_traits, scheduler_traits
-        , make_zip_iterator(boost_mmm_make_tuple(_m_pfds.begin(), _m_ctxitr.begin()))
+          make_zip_iterator(boost_mmm_make_tuple(_m_pfds.begin(), _m_ctxitr.begin()))
         , make_zip_iterator(boost_mmm_make_tuple(_m_pfds.end(), _m_ctxitr.end())));
     }
 
-    template <typename StrategyTraits, typename SchedulerTraits, typename ZipIterator>
+    template <typename ZipIterator>
     void
-    restore_contexts(StrategyTraits &strategy_traits
-    , SchedulerTraits &scheduler_traits, ZipIterator itr, ZipIterator end)
+    restore_contexts(ZipIterator itr, ZipIterator end)
     {
-        unique_lock<mutex> guard(scheduler_traits.get_lock());
+        unique_lock<mutex> guard(_m_scheduler_traits.get_lock());
 
         typedef void (StrategyTraits::*push_ctx)(SchedulerTraits, context_type);
         // Restore I/O ready contexts to schedular.
         std::for_each(itr, end
         , phoenix::bind(
             static_cast<push_ctx>(&StrategyTraits::push_ctx)
-          , boost::ref(strategy_traits)
-          , boost::ref(scheduler_traits)
+          , boost::ref(_m_strategy_traits)
+          , boost::ref(_m_scheduler_traits)
           , phoenix::move(
               *phoenix::at_c<1>(phoenix::placeholders::arg1))));
     }
@@ -206,11 +203,10 @@ class async_io_thread : private noncopyable
     }
 
 public:
-    template <typename SchedulerTraits, typename StrategyTraits>
     explicit
     async_io_thread(SchedulerTraits scheduler_traits, StrategyTraits strategy_traits)
-      : _m_th(&async_io_thread::exec<SchedulerTraits, StrategyTraits>
-        , boost::ref(*this), scheduler_traits, strategy_traits)
+      : _m_scheduler_traits(scheduler_traits), _m_strategy_traits(strategy_traits)
+      , _m_th(&async_io_thread::exec, boost::ref(*this))
       , _m_terminate(false) {}
 
     ~async_io_thread()
@@ -220,11 +216,13 @@ public:
     }
 
 private:
-    thread        _m_th;
-    ctxact_vector _m_ctxact;
-    ctxitr_vector _m_ctxitr;
-    pollfd_vector _m_pfds;
-    atomic<bool>  _m_terminate;
+    SchedulerTraits _m_scheduler_traits;
+    StrategyTraits  _m_strategy_traits;
+    thread          _m_th;
+    ctxact_vector   _m_ctxact;
+    ctxitr_vector   _m_ctxitr;
+    pollfd_vector   _m_pfds;
+    atomic<bool>    _m_terminate;
 }; // template class async_io_thread
 
 #if defined(BOOST_MMM_ZIP_ITERATOR_IS_A_INPUT_ITERATOR_CATEGORY)
