@@ -124,14 +124,15 @@ class async_io_thread : private noncopyable
         }
     }; // struct check_event
 
+    template <typename Rep, typename Period>
     void
-    exec()
+    exec(chrono::duration<Rep, Period> poll_TO)
     {
         system::error_code err_code;
         while (!_m_terminate)
         {
             using io::detail::poll_fds;
-            const int ret = poll_fds(_m_pfds.data(), _m_pfds.size(), chrono::milliseconds(10), err_code);
+            const int ret = poll_fds(_m_pfds.data(), _m_pfds.size(), poll_TO, err_code);
 
             if (!err_code && 0 < ret)
             {
@@ -203,10 +204,12 @@ class async_io_thread : private noncopyable
     }
 
 public:
+    template <typename Rep, typename Period>
     explicit
-    async_io_thread(SchedulerTraits scheduler_traits, StrategyTraits strategy_traits)
+    async_io_thread(SchedulerTraits scheduler_traits, StrategyTraits strategy_traits
+    , chrono::duration<Rep, Period> poll_TO)
       : _m_scheduler_traits(scheduler_traits), _m_strategy_traits(strategy_traits)
-      , _m_th(&async_io_thread::exec, boost::ref(*this))
+      , _m_th(&async_io_thread::exec<Rep, Period>, boost::ref(*this), poll_TO)
       , _m_terminate(false) {}
 
     ~async_io_thread()
