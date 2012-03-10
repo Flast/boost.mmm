@@ -120,7 +120,7 @@ class async_io_thread : private noncopyable
         bool
         operator()(BOOST_MMM_TUPLE<const pollfd &, typename ctxact_vector::iterator> pfd)
         {
-            return fusion::at_c<0>(pfd).revents != 0;
+            return fusion::at_c<0>(pfd).revents == 0;
         }
     }; // struct check_event
 
