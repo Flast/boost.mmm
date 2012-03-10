@@ -48,6 +48,9 @@
 #include <boost/checked_delete.hpp>
 #include <boost/interprocess/smart_ptr/unique_ptr.hpp>
 
+#include <boost/chrono/duration.hpp>
+#include <boost/mmm/detail/async_io_thread.hpp>
+
 #if !defined(BOOST_MMM_CONTAINER_HAS_NO_ALLOCATOR_TRAITS)
 #include <boost/container/allocator/allocator_traits.hpp>
 #endif
@@ -71,7 +74,19 @@ namespace boost { namespace mmm {
 
 namespace detail {
 
-template <typename StrategyTraits, typename Allocator>
+struct disabling_asio_pool {}; // struct disabling_asio_pool
+BOOST_STATIC_CONSTEXPR disabling_asio_pool noasyncpool;
+
+} // namespace boost::mmm::detail
+
+using detail::noasyncpool;
+
+template <typename Strategy, typename Allocator = std::allocator<void> >
+struct scheduler;
+
+namespace detail {
+
+template <typename SchedulerTraits, typename StrategyTraits, typename Allocator>
 struct scheduler_data : private noncopyable
 {
 #if !defined(BOOST_MMM_CONTAINER_HAS_NO_ALLOCATOR_TRAITS)
@@ -102,20 +117,35 @@ struct scheduler_data : private noncopyable
     typedef typename map_type<thread::id, thread>::type kernels_type;
     typedef typename StrategyTraits::pool_type users_type;
 
+    typedef
+      detail::async_io_thread<SchedulerTraits, StrategyTraits, Allocator>
+    async_io_thread;
+    // XXX: Should use specified allocator.
+    typedef
+      interprocess::unique_ptr<async_io_thread, checked_deleter<async_io_thread> >
+    async_pool_type;
+
     atomic<int>        status;
     unsigned           runnings;
     mutex              mtx;
     condition_variable cond;
     kernels_type       kernels;
     users_type         users;
+    async_pool_type    async_pool;
 
-    scheduler_data()
+    template <typename Rep, typename Period>
+    scheduler_data(SchedulerTraits scheduler_traits, chrono::duration<Rep, Period> poll_TO)
+      : status(0), runnings(0)
+      , async_pool(new async_io_thread(scheduler_traits, StrategyTraits(), poll_TO)) {}
+
+    explicit
+    scheduler_data(disabling_asio_pool)
       : status(0), runnings(0) {}
-}; // struct scheduler_data
+}; // template struct scheduler_data
 
 } // namespace boost::mmm::detail
 
-template <typename Strategy, typename Allocator = std::allocator<void> >
+template <typename Strategy, typename Allocator>
 class scheduler
 {
     BOOST_MOVABLE_BUT_NOT_COPYABLE(scheduler)
@@ -149,7 +179,7 @@ private:
       mmm::strategy_traits<strategy_type, detail::asio_context, allocator_type>
     strategy_traits;
 
-    typedef detail::scheduler_data<strategy_traits, allocator_type> scheduler_data;
+    typedef detail::scheduler_data<scheduler_traits, strategy_traits, allocator_type> scheduler_data;
     typedef typename scheduler_data::kernels_type kernels_type;
     typedef typename scheduler_data::users_type users_type;
 
@@ -159,26 +189,24 @@ public:
 private:
 #if !defined(BOOST_MMM_DOXYGEN_INVOKED)
     void
-    _m_resume_context(unique_lock<mutex> &guard, context_type &ctx)
+    _m_resume_context(unique_lock<mutex> &guard, scheduler_data &data, context_type &ctx)
     {
         using namespace detail;
         unique_unlock<mutex> unguard(guard);
 
         if (ctx.callback)
         {
-            using io::detail::check_events;
-            system::error_code err_code;
-            if (check_events(ctx.data->fd, ctx.data->events, err_code))
-            {
-                ctx.callback(ctx.data);
-                ctx.callback = 0;
-            }
+            ctx.callback(ctx.data);
+            ctx.callback = 0;
         }
-        else
+
+        current_context::set_current_ctx(&ctx);
+        ctx.resume();
+        current_context::set_current_ctx(0);
+
+        if (ctx.callback)
         {
-            current_context::set_current_ctx(&ctx);
-            ctx.resume();
-            current_context::set_current_ctx(0);
+            data.async_pool->push_ctx(move(ctx));
         }
     }
 
@@ -200,7 +228,7 @@ private:
             context_guard ctx_guard(scheduler_traits(*this), strategy_traits());
 
             ++data.runnings;
-            _m_resume_context(guard, ctx_guard.context());
+            _m_resume_context(guard, data, ctx_guard.context());
             --data.runnings;
 
             // Notify all even if context is finished to wakeup caller of join_all.
@@ -273,15 +301,17 @@ public:
       : _m_data(move(other._m_data)) {}
 
     /**
-     * <b>Effects</b>: Construct with specified count <i>kernel-threads</i>.
+     * <b>Effects</b>: Construct with specified count <i>kernel-threads</i>
+     * and poller timeout.
      *
      * <b>Throws</b>: std::invalid_argument (wrapped by Boost.Exception):
      * if default_count <= 0 .
      *
      * <b>Postcondition</b>: *this is not <i>not-in-scheduling</i>.
      */
+    template <typename Rep, typename Period>
     explicit
-    scheduler(const int default_count)
+    scheduler(const int default_count, chrono::duration<Rep, Period> poll_TO)
     {
         if (!(0 < default_count))
         {
@@ -291,7 +321,7 @@ public:
 
         // XXX: Should use specified allocator.
         // Defer initializing.
-        _m_data.reset(new scheduler_data);
+        _m_data.reset(new scheduler_data(scheduler_traits(*this), poll_TO));
         BOOST_ASSERT(_m_data);
 
         for (int cnt = 0; cnt < default_count; ++cnt)
@@ -430,7 +460,9 @@ private:
     bool
     joinable_nolock() const BOOST_NOEXCEPT
     {
-        return _m_data->users.size() != 0 || _m_data->runnings != 0;
+        return _m_data->users.size() != 0
+          || _m_data->runnings != 0
+          || _m_data->async_pool->joinable();
     }
 #endif
 public:
