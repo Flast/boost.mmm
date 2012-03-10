@@ -50,6 +50,24 @@ struct scheduler_traits
     }
 
     /**
+     * <b>Effects</b>: Notify all suspended scheduler threads without lock.
+     */
+    void
+    notify_all() const
+    {
+        _m_scheduler.get()._m_data->cond.notify_all();
+    }
+
+    /**
+     * <b>Effects</b>: Notify a suspended scheduler thread without lock.
+     */
+    void
+    notify_one() const
+    {
+        _m_scheduler.get()._m_data->cond.notify_one();
+    }
+
+    /**
      * <b>Effects</b>: Get scheduler locking object.
      *
      * <b>Returns</b>: Locking object.

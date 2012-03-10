@@ -59,9 +59,13 @@
 #endif
 
 #include <boost/atomic.hpp>
+#include <boost/thread/mutex.hpp>
+#include <boost/mmm/detail/locks.hpp>
+
 #include <boost/chrono/duration.hpp>
 #include <boost/system/error_code.hpp>
 #include <boost/mmm/io/detail/poll.hpp>
+#include <boost/mmm/detail/context.hpp>
 
 namespace boost { namespace mmm { namespace detail {
 
@@ -124,15 +128,26 @@ class async_io_thread : private noncopyable
         }
     }; // struct check_event
 
+    template <typename Duration>
+    int
+    polling(unique_lock<mutex> &guard, Duration poll_TO, system::error_code &err_code)
+    {
+        unique_unlock<mutex> unguard(guard);
+        using io::detail::poll_fds;
+        return poll_fds(_m_pfds.data(), _m_pfds.size(), poll_TO, err_code);
+    }
+
     template <typename Rep, typename Period>
     void
     exec(chrono::duration<Rep, Period> poll_TO)
     {
+        unique_lock<mutex> guard(_m_mtx);
+
         system::error_code err_code;
         while (!_m_terminate)
         {
-            using io::detail::poll_fds;
-            const int ret = poll_fds(_m_pfds.data(), _m_pfds.size(), poll_TO, err_code);
+            import_pendings();
+            const int ret = polling(guard, poll_TO, err_code);
 
             if (!err_code && 0 < ret)
             {
@@ -180,6 +195,7 @@ class async_io_thread : private noncopyable
           , boost::ref(_m_scheduler_traits)
           , phoenix::move(
               *phoenix::at_c<1>(phoenix::placeholders::arg1))));
+        _m_scheduler_traits.notify_all();
     }
 
     template <typename IteratorTuple, typename ZipIterator>
@@ -203,6 +219,32 @@ class async_io_thread : private noncopyable
         _m_ctxitr.erase(fusion::at_c<1>(itr_tuple), fusion::at_c<1>(end_tuple));
     }
 
+    void
+    import_pendings()
+    {
+        if (_m_pending_ctxs.size() == 0) { return; }
+
+        typedef typename ctxact_vector::iterator iterator;
+        iterator itr = --_m_ctxact.end();
+        for (iterator i = _m_pending_ctxs.begin(), end = _m_pending_ctxs.end(); i != end; ++i)
+        {
+            _m_ctxact.push_back(move(*i));
+        }
+        _m_pending_ctxs.clear();
+        for (iterator end = _m_ctxact.end(); ++itr != end; )
+        {
+            callbacks::cb_data &data = *static_cast<asio_context &>(*itr).data;
+            pollfd pfd =
+            {
+              /*.fd      =*/ data.fd
+            , /*.events  =*/ data.events
+            , /*.revents =*/ 0
+            };
+            _m_ctxitr.push_back(itr);
+            _m_pfds.push_back(pfd);
+        }
+    }
+
 public:
     template <typename Rep, typename Period>
     explicit
@@ -218,12 +260,28 @@ public:
         _m_th.join();
     }
 
+    void
+    push_ctx(context_type ctx)
+    {
+        lock_guard<mutex> guard(_m_mtx);
+        _m_pending_ctxs.push_back(move(ctx));
+    }
+
+    bool
+    joinable()
+    {
+        lock_guard<mutex> guard(_m_mtx);
+        return (_m_ctxact.size() + _m_pending_ctxs.size()) != 0;
+    }
+
 private:
     SchedulerTraits _m_scheduler_traits;
     StrategyTraits  _m_strategy_traits;
+    mutex           _m_mtx;
     thread          _m_th;
     ctxact_vector   _m_ctxact;
     ctxitr_vector   _m_ctxitr;
+    ctxact_vector   _m_pending_ctxs;
     pollfd_vector   _m_pfds;
     atomic<bool>    _m_terminate;
 }; // template class async_io_thread
