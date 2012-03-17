@@ -37,7 +37,7 @@
 #   define BOOST_MMM_THREAD_SUPPORTS_MOVE_BASED_MOVE
 #endif
 
-// See detail::async_io_thread.hpp
+// See detail/iterator/zip_iterator.hpp
 #define BOOST_MMM_ZIP_ITERATOR_IS_A_INPUT_ITERATOR_CATEGORY
 
 #endif
