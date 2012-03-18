@@ -196,6 +196,16 @@ private:
 
         if (ctx.callback)
         {
+            if (!data.async_pool)
+            {
+                using io::detail::check_events;
+                system::error_code err_code;
+                if (!check_events(ctx.data->fd, ctx.data->events, err_code))
+                {
+                    // No events were occured.
+                    return;
+                }
+            }
             ctx.callback(ctx.data);
             ctx.callback = 0;
         }
@@ -204,7 +214,7 @@ private:
         ctx.resume();
         current_context::set_current_ctx(0);
 
-        if (ctx.callback)
+        if (data.async_pool && ctx.callback)
         {
             data.async_pool->push_ctx(move(ctx));
         }
@@ -290,6 +300,29 @@ private:
     }
 #endif
 
+    void
+    _m_construct_thread_pool(const int default_count)
+    {
+        BOOST_ASSERT(_m_data);
+
+        for (int cnt = 0; cnt < default_count; ++cnt)
+        {
+            thread th(&scheduler::_m_exec, boost::ref(*this), boost::ref(*_m_data));
+
+#if !defined(BOOST_MMM_CONTAINER_BREAKING_EMPLACE_RETURN_TYPE)
+            std::pair<typename kernels_type::iterator, bool> r =
+#endif
+            _m_data->kernels.emplace(th.get_id(), move(th));
+#if !defined(BOOST_MMM_CONTAINER_BREAKING_EMPLACE_RETURN_TYPE)
+            BOOST_ASSERT(r.second);
+            BOOST_MMM_DETAIL_UNUSED(r);
+#endif
+        }
+#if defined(BOOST_MMM_CONTAINER_BREAKING_EMPLACE_RETURN_TYPE)
+        BOOST_ASSERT(_m_data->kernels.size() == default_count);
+#endif
+    }
+
 public:
     /**
      * <b>Effects</b>: Move internal scheduler datas from the other. And the
@@ -322,25 +355,28 @@ public:
         // XXX: Should use specified allocator.
         // Defer initializing.
         _m_data.reset(new scheduler_data(scheduler_traits(*this), poll_TO));
-        BOOST_ASSERT(_m_data);
+        _m_construct_thread_pool(default_count);
+    }
 
-        for (int cnt = 0; cnt < default_count; ++cnt)
+    /**
+     * <b>Effects</b>: Construct with specified count <i>kernel-threads</i>.
+     *
+     * <b>Throws</b>: std::invalid_argument (wrapped by Boost.Exception):
+     * if default_count <= 0 .
+     *
+     * <b>Postcondition</b>: *this is not <i>not-in-scheduling</i>.
+     */
+    explicit
+    scheduler(const int default_count, detail::disabling_asio_pool)
+    {
+        if (!(0 < default_count))
         {
-            thread th(&scheduler::_m_exec, boost::ref(*this), boost::ref(*_m_data));
-
-#if !defined(BOOST_MMM_CONTAINER_BREAKING_EMPLACE_RETURN_TYPE)
-            std::pair<typename kernels_type::iterator, bool> r =
-#endif
-            // Call Boost.Move's boost::move via ADL
-            _m_data->kernels.emplace(th.get_id(), move(th));
-#if !defined(BOOST_MMM_CONTAINER_BREAKING_EMPLACE_RETURN_TYPE)
-            BOOST_ASSERT(r.second);
-            BOOST_MMM_DETAIL_UNUSED(r);
-#endif
+            using std::invalid_argument;
+            BOOST_THROW_EXCEPTION(invalid_argument("default_count should be > 0"));
         }
-#if defined(BOOST_MMM_CONTAINER_BREAKING_EMPLACE_RETURN_TYPE)
-        BOOST_ASSERT(_m_data->kernels.size() == default_count);
-#endif
+
+        _m_data.reset(new scheduler_data(noasyncpool));
+        _m_construct_thread_pool(default_count);
     }
 
     /**
@@ -351,8 +387,7 @@ public:
      */
     ~scheduler()
     {
-        if (!_m_data) { return; }
-
+        BOOST_ASSERT(_m_data);
         if (joinable()) { std::terminate(); }
 
         {
@@ -462,7 +497,7 @@ private:
     {
         return _m_data->users.size() != 0
           || _m_data->runnings != 0
-          || _m_data->async_pool->joinable();
+          || (_m_data->async_pool && _m_data->async_pool->joinable());
     }
 #endif
 public:
