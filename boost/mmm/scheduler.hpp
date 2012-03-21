@@ -359,11 +359,11 @@ public:
      */
     template <typename Fn, typename... Args>
 #if !defined(BOOST_MMM_DOXYGEN_INVOKED)
-    typename disable_if<is_same<size_type, Fn>,
-#endif
-      BOOST_MMM_THREAD_FUTURE<typename result_of<Fn(Args...)>::type>
-#if !defined(BOOST_MMM_DOXYGEN_INVOKED)
-      >::type
+    typename disable_if<
+      is_same<size_type, Fn>
+    , BOOST_MMM_THREAD_FUTURE<typename result_of<Fn(Args...)>::type> >::type
+#else
+    future<typename result_of<Fn(Args...)>::type>
 #endif
     add_thread(Fn fn, Args... args)
     {
@@ -386,7 +386,7 @@ public:
 #if !defined(BOOST_MMM_DOXYGEN_INVOKED)
     BOOST_MMM_THREAD_FUTURE<typename result_of<Fn(typename remove_reference<Args>::type...)>::type>
 #else
-    BOOST_MMM_THREAD_FUTURE<typename result_of<Fn(Args...)>::type>
+    future<typename result_of<Fn(Args...)>::type>
 #endif
     add_thread(size_type size, Fn fn, Args... args)
     {
@@ -500,6 +500,7 @@ private:
     scheduler_data_ptr _m_data;
 }; // template class scheduler
 
+#if !defined(BOOST_MMM_DOXYGEN_INVOKED)
 template <typename Strategy, typename Allocator>
 template <typename R, typename>
 struct scheduler<Strategy, Allocator>::context_starter
@@ -573,6 +574,7 @@ struct scheduler<Strategy, Allocator>::context_starter<void, Dummy>
     }
 #endif
 }; // template struct scheduler::context_starter
+#endif
 
 } } // namespace boost::mmm
 
