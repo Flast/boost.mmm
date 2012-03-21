@@ -12,6 +12,7 @@
 
 #include <boost/config.hpp>
 #include <boost/mmm/detail/workaround.hpp>
+#include <boost/cstdint.hpp>
 
 #include <boost/assert.hpp>
 #if !defined(BOOST_MMM_CONTAINER_BREAKING_EMPLACE_RETURN_TYPE)
@@ -37,6 +38,8 @@
 #include <boost/mmm/detail/thread.hpp>
 #include <boost/context/context.hpp>
 #include <boost/context/stack_utils.hpp>
+#include <boost/thread/future.hpp>
+#include <boost/utility/result_of.hpp>
 
 #include <boost/atomic.hpp>
 #include <boost/thread/condition_variable.hpp>
@@ -203,45 +206,19 @@ private:
 
     // To run context should call start(). However, cannot get informations
     // about the context was started.
-    struct context_starter
-    {
-        reference_wrapper<context_type> _m_ctx;
+    template <typename R, typename = void>
+    struct context_starter;
 
-        explicit
-        context_starter(context_type &ctx)
-          : _m_ctx(ctx) {}
-
-#if defined(BOOST_NO_VARIADIC_TEMPLATES)
-#define BOOST_MMM_context_starter_op_call(unused_z_, n_, unused_data_)  \
-        template <typename Fn BOOST_PP_ENUM_TRAILING_PARAMS(n_, typename Arg)> \
-        void                                                            \
-        operator()(Fn &fn BOOST_PP_ENUM_TRAILING_BINARY_PARAMS(n_, Arg, &arg)) const \
-        {                                                               \
-            _m_ctx.get().suspend();                                     \
-            fn(BOOST_PP_ENUM_PARAMS(n_, arg));                          \
-        }                                                               \
-// BOOST_MMM_context_starter_op_call
-        BOOST_PP_REPEAT(BOOST_PP_INC(BOOST_CONTEXT_ARITY), BOOST_MMM_context_starter_op_call, ~)
-#undef BOOST_MMM_context_starter_op_call
-#else
-        template <typename Fn, typename... Args>
-        void
-        operator()(Fn &fn, Args &... args) const
-        {
-            _m_ctx.get().suspend();
-            fn(args...);
-        }
-#endif
-    }; // template struct context_starter
-
-    static void
+    template <typename T>
+    static BOOST_MMM_THREAD_FUTURE<T>
     start_context(context_type &ctx)
     {
         using namespace detail;
 
         current_context::set_current_ctx(&ctx);
-        ctx.start();
+        BOOST_MMM_THREAD_FUTURE<T> f = reinterpret_cast<promise<T> *>(ctx.start())->get_future();
         current_context::set_current_ctx(0);
+        return move(f);
     }
 #endif
 
@@ -326,38 +303,49 @@ public:
 
     // To prevent unnecessary coping, explicit instantiation with lvalue reference.
 #if !defined(BOOST_MMM_DOXYGEN_INVOKED) && defined(BOOST_NO_VARIADIC_TEMPLATES)
+#define BOOST_MMM_enum_rmref_params(n_, T_) \
+    BOOST_PP_ENUM_BINARY_PARAMS(n_, typename remove_reference<T_, >::type BOOST_PP_INTERCEPT)
 #define BOOST_MMM_scheduler_add_thread(unused_z_, n_, unused_data_)         \
     template <typename Fn BOOST_PP_ENUM_TRAILING_PARAMS(n_, typename Arg)>  \
-    typename disable_if<is_same<size_type, Fn> >::type                      \
+    typename disable_if<                                                    \
+      is_same<size_type, Fn>                                                \
+    , BOOST_MMM_THREAD_FUTURE<typename result_of<typename remove_reference<Fn>::type(BOOST_PP_ENUM_PARAMS(n_, Arg))>::type> >::type \
     add_thread(Fn fn BOOST_PP_ENUM_TRAILING_BINARY_PARAMS(n_, Arg, arg))    \
     {                                                                       \
         BOOST_ASSERT(_m_data);                                              \
-        add_thread<Fn & BOOST_PP_ENUM_TRAILING_BINARY_PARAMS(n_, Arg, & BOOST_PP_INTERCEPT)>( \
+        return add_thread<Fn & BOOST_PP_ENUM_TRAILING_BINARY_PARAMS(n_, Arg, & BOOST_PP_INTERCEPT)>( \
           contexts::default_stacksize()                                     \
         , fn BOOST_PP_ENUM_TRAILING_PARAMS(n_, arg));                       \
     }                                                                       \
                                                                             \
     template <typename Fn BOOST_PP_ENUM_TRAILING_PARAMS(n_, typename Arg)>  \
-    void                                                                    \
+    BOOST_MMM_THREAD_FUTURE<typename result_of<typename remove_reference<Fn>::type(BOOST_MMM_enum_rmref_params(n_, Arg))>::type> \
     add_thread(size_type size, Fn fn BOOST_PP_ENUM_TRAILING_BINARY_PARAMS(n_, Arg, arg)) \
     {                                                                       \
         BOOST_ASSERT(_m_data);                                              \
         using contexts::no_stack_unwind;                                    \
         using contexts::return_to_caller;                                   \
                                                                             \
+        typedef typename remove_reference<Fn>::type fn_type;                \
+        typedef typename                                                    \
+          result_of<fn_type(BOOST_MMM_enum_rmref_params(n_, Arg))>::type    \
+        fn_result_type;                                                     \
+                                                                            \
         context_type ctx;                                                   \
         context_type(                                                       \
-          context_starter(ctx), fn BOOST_PP_ENUM_TRAILING_PARAMS(n_, arg) \
+          context_starter<fn_result_type>(ctx), fn BOOST_PP_ENUM_TRAILING_PARAMS(n_, arg) \
         , size, no_stack_unwind, return_to_caller).swap(ctx);               \
-        start_context(ctx);                                                 \
+        BOOST_MMM_THREAD_FUTURE<fn_result_type> f = start_context<fn_result_type>(ctx); \
                                                                             \
         unique_lock<mutex> guard(_m_data->mtx);                             \
         strategy_traits().push_ctx(scheduler_traits(*this), move(ctx));     \
         _m_data->cond.notify_one();                                         \
+        return move(f);                                                     \
     }                                                                       \
 // BOOST_MMM_scheduler_add_thread
     BOOST_PP_REPEAT(BOOST_PP_INC(BOOST_CONTEXT_ARITY), BOOST_MMM_scheduler_add_thread, ~)
 #undef BOOST_MMM_scheduler_add_thread
+#undef BOOST_MMM_enum_rmref_params
 #else
     /**
      * <b>Precondition</b>: *this is not <i>not-in-scheduling</i>.
@@ -365,19 +353,23 @@ public:
      * <b>Effects</b>: Construct context and join to scheduling with default
      * stack size.
      *
+     * <b>Returns</b>: An object of future<typename result_of<Fn(Args...)>::type>.
+     *
      * <b>Requires</b>: All of functor and arguments are <b>CopyConstructible</b>.
      */
     template <typename Fn, typename... Args>
 #if !defined(BOOST_MMM_DOXYGEN_INVOKED)
-    typename disable_if<is_same<size_type, Fn> >::type
-#else
-    void
+    typename disable_if<is_same<size_type, Fn>,
+#endif
+      BOOST_MMM_THREAD_FUTURE<typename result_of<Fn(Args...)>::type>
+#if !defined(BOOST_MMM_DOXYGEN_INVOKED)
+      >::type
 #endif
     add_thread(Fn fn, Args... args)
     {
         BOOST_ASSERT(_m_data);
         using contexts::default_stacksize;
-        add_thread<Fn &, Args &...>(default_stacksize(), fn, args...);
+        return add_thread<Fn &, Args &...>(default_stacksize(), fn, args...);
     }
 
     /**
@@ -386,25 +378,38 @@ public:
      * <b>Effects</b>: Construct context and join to scheduling with specified
      * stack size.
      *
+     * <b>Returns</b>: An object of future<typename result_of<Fn(Args...)>::type>.
+     *
      * <b>Requires</b>: All of functor and arguments are <b>CopyConstructible</b>.
      */
     template <typename Fn, typename... Args>
-    void
+#if !defined(BOOST_MMM_DOXYGEN_INVOKED)
+    BOOST_MMM_THREAD_FUTURE<typename result_of<Fn(typename remove_reference<Args>::type...)>::type>
+#else
+    BOOST_MMM_THREAD_FUTURE<typename result_of<Fn(Args...)>::type>
+#endif
     add_thread(size_type size, Fn fn, Args... args)
     {
         BOOST_ASSERT(_m_data);
         using contexts::no_stack_unwind;
         using contexts::return_to_caller;
 
+        typedef typename detail::function_to_functor<Fn>::type fn_type;
+        typedef typename
+          result_of<fn_type(typename remove_reference<Args>::type...)>::type
+        fn_result_type;
+
         context_type ctx;
         context_type(
-          context_starter(ctx), fn, args...
+          context_starter<fn_result_type>(ctx), fn, args...
         , size, no_stack_unwind, return_to_caller).swap(ctx);
-        start_context(ctx);
+        BOOST_MMM_THREAD_FUTURE<fn_result_type> f = start_context<fn_result_type>(ctx);
 
         unique_lock<mutex> guard(_m_data->mtx);
         strategy_traits().push_ctx(scheduler_traits(*this), move(ctx));
         _m_data->cond.notify_one();
+
+        return move(f);
     }
 #endif
 
@@ -494,6 +499,80 @@ private:
 
     scheduler_data_ptr _m_data;
 }; // template class scheduler
+
+template <typename Strategy, typename Allocator>
+template <typename R, typename>
+struct scheduler<Strategy, Allocator>::context_starter
+{
+    typedef typename scheduler<Strategy, Allocator>::context_type context_type;
+    reference_wrapper<context_type> _m_ctx;
+
+    explicit
+    context_starter(context_type &ctx)
+      : _m_ctx(ctx) {}
+
+#if defined(BOOST_NO_VARIADIC_TEMPLATES)
+#define BOOST_MMM_context_starter_op_call(unused_z_, n_, unused_data_)  \
+    template <typename Fn BOOST_PP_ENUM_TRAILING_PARAMS(n_, typename Arg)> \
+    void                                                                \
+    operator()(Fn &fn BOOST_PP_ENUM_TRAILING_BINARY_PARAMS(n_, Arg, &arg)) const \
+    {                                                                   \
+        promise<R> p;                                                   \
+        _m_ctx.get().suspend(reinterpret_cast<intptr_t>(&p));    \
+        p.set_value(fn(BOOST_PP_ENUM_PARAMS(n_, arg)));                 \
+    }                                                                   \
+// BOOST_MMM_context_starter_op_call
+    BOOST_PP_REPEAT(BOOST_PP_INC(BOOST_CONTEXT_ARITY), BOOST_MMM_context_starter_op_call, ~)
+#undef BOOST_MMM_context_starter_op_call
+#else
+    template <typename Fn, typename... Args>
+    void
+    operator()(Fn &fn, Args &... args) const
+    {
+        promise<R> p;
+        _m_ctx.get().suspend(reinterpret_cast<intptr_t>(&p));
+        p.set_value(fn(args...));
+    }
+#endif
+}; // template struct scheduler::context_starter
+
+template <typename Strategy, typename Allocator>
+template <typename Dummy>
+struct scheduler<Strategy, Allocator>::context_starter<void, Dummy>
+{
+    typedef typename scheduler<Strategy, Allocator>::context_type context_type;
+    reference_wrapper<context_type> _m_ctx;
+
+    explicit
+    context_starter(context_type &ctx)
+      : _m_ctx(ctx) {}
+
+#if defined(BOOST_NO_VARIADIC_TEMPLATES)
+#define BOOST_MMM_context_starter_op_call(unused_z_, n_, unused_data_)  \
+    template <typename Fn BOOST_PP_ENUM_TRAILING_PARAMS(n_, typename Arg)> \
+    void                                                                \
+    operator()(Fn &fn BOOST_PP_ENUM_TRAILING_BINARY_PARAMS(n_, Arg, &arg)) const \
+    {                                                                   \
+        promise<void> p;                                                \
+        _m_ctx.get().suspend(reinterpret_cast<intptr_t>(&p));           \
+        fn(BOOST_PP_ENUM_PARAMS(n_, arg));                              \
+        p.set_value();                                                  \
+    }                                                                   \
+// BOOST_MMM_context_starter_op_call
+    BOOST_PP_REPEAT(BOOST_PP_INC(BOOST_CONTEXT_ARITY), BOOST_MMM_context_starter_op_call, ~)
+#undef BOOST_MMM_context_starter_op_call
+#else
+    template <typename Fn, typename... Args>
+    void
+    operator()(Fn &fn, Args &... args) const
+    {
+        promise<void> p;
+        _m_ctx.get().suspend(reinterpret_cast<intptr_t>(&p));
+        fn(args...);
+        p.set_value();
+    }
+#endif
+}; // template struct scheduler::context_starter
 
 } } // namespace boost::mmm
 
