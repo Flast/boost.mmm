@@ -70,7 +70,8 @@ private:
     bool
     is_suspended() const BOOST_NOEXCEPT
     {
-        return context() && !context().is_complete();
+        using fusion::at_c;
+        return at_c<0>(context()) && !at_c<0>(context()).is_complete();
     }
 
     scheduler_traits _m_scheduler;

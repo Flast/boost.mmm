@@ -7,14 +7,14 @@
 #define BOOST_MMM_IO_POSIX_UNISTD_HPP
 
 #include <cstddef>
-#include <utility>
-
-#include <boost/fusion/include/vector.hpp>
-#include <boost/fusion/include/at_c.hpp>
 
 #include <boost/mmm/detail/context.hpp>
 #include <boost/mmm/detail/current_context.hpp>
-#include <boost/mmm/io/detail/poll.hpp>
+
+#include <boost/optional.hpp>
+#include <boost/fusion/include/at.hpp>
+
+#include <boost/mmm/io/detail/check_events.hpp>
 
 #include <unistd.h>
 
@@ -22,43 +22,84 @@ namespace boost { namespace mmm { namespace io { namespace posix {
 
 namespace detail {
 
-template <typename Impl>
-inline typename fusion::result_of::at_c<typename Impl::data, 0>::type
-yield_blocker_syscall(int fd, short events, typename Impl::data &rd)
+template <typename T>
+class posix_callback : public mmm::detail::io_callback_base
+{
+    typedef mmm::detail::io_callback_base base_type;
+
+protected:
+    typedef T result_type;
+
+    explicit
+    posix_callback(base_type::event_type::type event, int fd)
+      : base_type(event), _m_fd(fd), _m_result(0) {}
+
+    void
+    set_result(result_type val) { _m_result = val; }
+
+public:
+    int
+    get_fd() const { return _m_fd; }
+
+    boost::optional<result_type>
+    get_result() const { return _m_result; }
+
+    virtual bool
+    check_events(system::error_code &err_code) const
+    {
+        using io::detail::check_events;
+        return check_events(get_fd(), get_events(), err_code);
+    }
+
+    virtual bool
+    done() const { return get_result() != boost::none; }
+
+private:
+    int                          _m_fd;
+    boost::optional<result_type> _m_result;
+}; // template class posix_callback_base
+
+template <typename T>
+inline void
+yield_blocker_syscall(posix_callback<T> &callback)
 {
     using mmm::detail::current_context::get_current_ctx;
-    using mmm::detail::asio_context;
+    typedef mmm::detail::context_tuple context_tuple;
 
-    asio_context::cb_data d =
+    if (context_tuple *ctx_tuple = get_current_ctx())
     {
-      /*.fd     =*/ fd
-    , /*.events =*/ events
-    , /*.data   =*/ &rd
-    };
-    asio_context *ctx = static_cast<asio_context *>(get_current_ctx());
-    ctx->callback     = Impl::impl;
-    ctx->data         = &d;
-    ctx->suspend();
-    return fusion::at_c<0>(rd);
+        fusion::at_c<1>(*ctx_tuple) = &callback;
+        fusion::at_c<0>(*ctx_tuple).suspend();
+    }
+    else
+    {
+        callback();
+    }
 }
 
 } // namespace boost::mmm::io::posix::detail
 
 namespace detail {
 
-struct read_impl
+class read_callback : public posix_callback<ssize_t>
 {
-    typedef fusion::vector<ssize_t, void *, std::size_t> data;
+    typedef posix_callback<ssize_t> base_type;
 
-    static void *
-    impl(mmm::detail::asio_context::cb_data *d)
+    void        *_m_buf;
+    std::size_t _m_count;
+
+public:
+    explicit
+    read_callback(int fd, void *buf, std::size_t count)
+      : base_type(base_type::event_type::in, fd)
+      , _m_buf(buf), _m_count(count) {}
+
+    virtual void
+    operator()()
     {
-        using fusion::at_c;
-        data &rd = *static_cast<data *>(d->data);
-        at_c<0>(rd) = ::read(d->fd, at_c<1>(rd), at_c<2>(rd));
-        return NULL;
+        set_result(::read(get_fd(), _m_buf, _m_count));
     }
-}; // struct read_impl
+}; // class read_callback
 
 } // namespace boost::mmm::io::posix::detail
 
@@ -67,30 +108,43 @@ struct read_impl
 inline ssize_t
 read(int fd, void *buf, std::size_t count)
 {
-    if (count == 0) { return ::read(fd, buf, count); }
-
     using namespace detail;
-    using io::detail::polling_events;
+    read_callback callback(fd, buf, count);
 
-    read_impl::data rd(0, buf, count);
-    return yield_blocker_syscall<read_impl>(fd, polling_events::in, rd);
+    if (count == 0)
+    {
+        callback();
+    }
+    else
+    {
+        yield_blocker_syscall(callback);
+    }
+
+    const boost::optional<ssize_t> result = callback.get_result();
+    return result != boost::none ? result.get() : -1;
 }
 
 namespace detail {
 
-struct write_impl
+class write_callback : public posix_callback<ssize_t>
 {
-    typedef fusion::vector<ssize_t, const void *, std::size_t> data;
+    typedef posix_callback<ssize_t> base_type;
 
-    static void *
-    impl(mmm::detail::asio_context::cb_data *d)
+    const void  *_m_buf;
+    std::size_t _m_count;
+
+public:
+    explicit
+    write_callback(int fd, const void *buf, std::size_t count)
+      : base_type(base_type::event_type::out, fd)
+      , _m_buf(buf), _m_count(count) {}
+
+    virtual void
+    operator()()
     {
-        using fusion::at_c;
-        data &rd = *static_cast<data *>(d->data);
-        at_c<0>(rd) = ::write(d->fd, at_c<1>(rd), at_c<2>(rd));
-        return NULL;
+        set_result(::write(get_fd(), _m_buf, _m_count));
     }
-}; // struct write_impl
+}; // class write_callback
 
 } // namespace boost::mmm::io::posix::detail
 
@@ -100,9 +154,10 @@ inline ssize_t
 write(int fd, const void *buf, std::size_t count)
 {
     using namespace detail;
-    using io::detail::polling_events;
-    write_impl::data rd(0, buf, count);
-    return yield_blocker_syscall<write_impl>(fd, polling_events::out, rd);
+    write_callback callback(fd, buf, count);
+    yield_blocker_syscall(callback);
+    const boost::optional<ssize_t> result = callback.get_result();
+    return result != boost::none ? result.get() : -1;
 }
 
 } } } } // namespace boost::mmm:io::posix

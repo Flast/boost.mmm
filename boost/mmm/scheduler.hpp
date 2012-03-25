@@ -37,6 +37,7 @@
 #include <boost/mmm/detail/thread.hpp>
 #include <boost/mmm/detail/context.hpp>
 #include <boost/context/stack_utils.hpp>
+#include <boost/fusion/include/at.hpp>
 
 #include <boost/system/error_code.hpp>
 
@@ -64,8 +65,6 @@
 #include <boost/mmm/detail/context_guard.hpp>
 #include <boost/mmm/strategy_traits.hpp>
 #include <boost/mmm/scheduler_traits.hpp>
-
-#include <boost/mmm/io/detail/check_events.hpp>
 
 namespace boost { namespace mmm {
 
@@ -146,7 +145,7 @@ private:
 #endif
     typedef mmm::scheduler_traits<this_type> scheduler_traits;
     typedef
-      mmm::strategy_traits<strategy_type, detail::asio_context, allocator_type>
+      mmm::strategy_traits<strategy_type, detail::context_tuple, allocator_type>
     strategy_traits;
 
     typedef detail::scheduler_data<strategy_traits, allocator_type> scheduler_data;
@@ -164,20 +163,19 @@ private:
         using namespace detail;
         unique_unlock<mutex> unguard(guard);
 
-        if (ctx.callback)
+        io_callback_base *callback = fusion::at_c<1>(ctx);
+        if (callback && !callback->done())
         {
-            using io::detail::check_events;
             system::error_code err_code;
-            if (check_events(ctx.data->fd, ctx.data->events, err_code))
+            if (callback->check_events(err_code))
             {
-                ctx.callback(ctx.data);
-                ctx.callback = 0;
+                callback->operator()();
             }
         }
         else
         {
             current_context::set_current_ctx(&ctx);
-            ctx.resume();
+            fusion::at_c<0>(ctx).resume();
             current_context::set_current_ctx(0);
         }
     }
@@ -234,7 +232,7 @@ private:
         void                                                            \
         operator()(Fn &fn BOOST_PP_ENUM_TRAILING_BINARY_PARAMS(n_, Arg, &arg)) const \
         {                                                               \
-            _m_ctx.get().suspend();                                     \
+            fusion::at_c<0>(unwrap_ref(_m_ctx)).suspend();              \
             fn(BOOST_PP_ENUM_PARAMS(n_, arg));                          \
         }                                                               \
 // BOOST_MMM_context_starter_op_call
@@ -245,7 +243,7 @@ private:
         void
         operator()(Fn &fn, Args &... args) const
         {
-            _m_ctx.get().suspend();
+            fusion::at_c<0>(unwrap_ref(_m_ctx)).suspend();
             fn(args...);
         }
 #endif
@@ -257,7 +255,7 @@ private:
         using namespace detail;
 
         current_context::set_current_ctx(&ctx);
-        ctx.start();
+        fusion::at_c<0>(ctx).start();
         current_context::set_current_ctx(0);
     }
 #endif
@@ -363,9 +361,9 @@ public:
         using contexts::return_to_caller;                                   \
                                                                             \
         context_type ctx;                                                   \
-        context_type(                                                       \
-          context_starter(ctx), fn BOOST_PP_ENUM_TRAILING_PARAMS(n_, arg) \
-        , size, no_stack_unwind, return_to_caller).swap(ctx);               \
+        contexts::context(                                                  \
+          context_starter(ctx), fn BOOST_PP_ENUM_TRAILING_PARAMS(n_, arg)   \
+        , size, no_stack_unwind, return_to_caller).swap(fusion::at_c<0>(ctx)); \
         start_context(ctx);                                                 \
                                                                             \
         unique_lock<mutex> guard(_m_data->mtx);                             \
@@ -414,9 +412,9 @@ public:
         using contexts::return_to_caller;
 
         context_type ctx;
-        context_type(
+        contexts::context(
           context_starter(ctx), fn, args...
-        , size, no_stack_unwind, return_to_caller).swap(ctx);
+        , size, no_stack_unwind, return_to_caller).swap(fusion::at_c<0>(ctx));
         start_context(ctx);
 
         unique_lock<mutex> guard(_m_data->mtx);
