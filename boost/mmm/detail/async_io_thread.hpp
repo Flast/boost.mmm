@@ -27,20 +27,10 @@
 #include <boost/mmm/detail/phoenix/move.hpp>
 
 #include <algorithm>
-#include <boost/mmm/detail/iterator/zip_iterator.hpp>
-#if !defined(BOOST_MMM_ZIP_ITERATOR_IS_A_INPUT_ITERATOR_CATEGORY)
+#include <iterator>
+#include <cstddef>
+#include <boost/iterator/zip_iterator.hpp>
 #include <boost/tuple/tuple.hpp>
-#include <boost/fusion/include/boost_tuple.hpp>
-#include <boost/fusion/include/at.hpp>
-#define BOOST_MMM_TUPLE ::boost::tuple
-#define boost_mmm_make_tuple ::boost::make_tuple
-#else
-#include <boost/fusion/include/vector.hpp>
-#include <boost/fusion/include/make_vector.hpp>
-#include <boost/fusion/include/at.hpp>
-#define BOOST_MMM_TUPLE ::boost::fusion::vector
-#define boost_mmm_make_tuple ::boost::fusion::make_vector
-#endif
 
 #include <boost/atomic.hpp>
 #include <boost/thread/mutex.hpp>
@@ -52,6 +42,33 @@
 #include <boost/mmm/detail/context.hpp>
 
 namespace boost { namespace mmm { namespace detail {
+
+// This dummy iterator guards unexpected behavior caused by specialized
+// std::iterator_traits.
+template <typename Category>
+struct specialization_guard_iterator
+  : public std::iterator<
+      Category
+    , specialization_guard_iterator<Category>
+    , std::ptrdiff_t
+    , specialization_guard_iterator<Category>
+    , specialization_guard_iterator<Category> >
+{
+    specialization_guard_iterator
+    operator++() const { return *this;}
+
+    specialization_guard_iterator
+    operator--() const { return *this; }
+
+    specialization_guard_iterator
+    operator*() const { return *this; }
+
+    bool
+    operator==(specialization_guard_iterator) const { return true; }
+
+    bool
+    operator!=(specialization_guard_iterator) const { return true; }
+};
 
 template <typename SchedulerTraits, typename StrategyTraits, typename Alloc>
 class async_io_thread : private noncopyable
@@ -93,10 +110,11 @@ class async_io_thread : private noncopyable
 
     struct check_event
     {
+        template <typename GuardIterator, typename ActIterator>
         bool
-        operator()(BOOST_MMM_TUPLE<const pollfd &, typename ctxact_vector::iterator> pfd)
+        operator()(tuple<GuardIterator, const pollfd &, ActIterator> pfd) const
         {
-            return fusion::at_c<0>(pfd).revents == 0;
+            return boost::get<1>(pfd).revents == 0;
         }
     }; // struct check_event
 
@@ -113,6 +131,10 @@ class async_io_thread : private noncopyable
     void
     exec(chrono::duration<Rep, Period> poll_TO)
     {
+        typedef
+          specialization_guard_iterator<std::random_access_iterator_tag>
+        guard_iterator;
+
         unique_lock<mutex> guard(_m_mtx);
 
         system::error_code err_code;
@@ -124,17 +146,18 @@ class async_io_thread : private noncopyable
             if (!err_code && 0 < ret)
             {
                 typedef
-                  BOOST_MMM_TUPLE<
-                    typename pollfd_vector::iterator
+                  tuple<
+                    guard_iterator
+                  , typename pollfd_vector::iterator
                   , typename ctxitr_vector::iterator>
                 iterator_tuple;
 
                 typedef zip_iterator<iterator_tuple> zipitr;
-                const zipitr zipend(boost_mmm_make_tuple(_m_pfds.end(), _m_ctxitr.end()));
+                const zipitr zipend(make_tuple(guard_iterator(), _m_pfds.end(), _m_ctxitr.end()));
 
                 zip_iterator<iterator_tuple> itr =
                   std::partition(
-                    zipitr(boost_mmm_make_tuple(_m_pfds.begin(), _m_ctxitr.begin()))
+                    zipitr(make_tuple(guard_iterator(), _m_pfds.begin(), _m_ctxitr.begin()))
                   , zipend
                   , check_event());
 
@@ -148,8 +171,8 @@ class async_io_thread : private noncopyable
 
         // Cleanup all remained contexts.
         restore_contexts(
-          make_zip_iterator(boost_mmm_make_tuple(_m_pfds.begin(), _m_ctxitr.begin()))
-        , make_zip_iterator(boost_mmm_make_tuple(_m_pfds.end(), _m_ctxitr.end())));
+          make_zip_iterator(make_tuple(guard_iterator(), _m_pfds.begin(), _m_ctxitr.begin()))
+        , make_zip_iterator(make_tuple(guard_iterator(), _m_pfds.end(), _m_ctxitr.end())));
     }
 
     template <typename ZipIterator>
@@ -166,7 +189,7 @@ class async_io_thread : private noncopyable
           , boost::ref(_m_strategy_traits)
           , boost::ref(_m_scheduler_traits)
           , phoenix::move(
-              *phoenix::at_c<1>(phoenix::placeholders::arg1))));
+              *phoenix::at_c<2>(phoenix::placeholders::arg1))));
         _m_scheduler_traits.notify_all();
     }
 
@@ -182,13 +205,13 @@ class async_io_thread : private noncopyable
         typedef ctxact_iterator (ctxact_vector::*eraser)(ctxact_const_iterator);
         // Erase resotred contexts.
         std::for_each(
-          fusion::at_c<1>(itr_tuple), fusion::at_c<1>(end_tuple)
+          boost::get<2>(itr_tuple), boost::get<2>(end_tuple)
         , phoenix::bind(
             static_cast<eraser>(&ctxact_vector::erase)
           , boost::ref(_m_ctxact)
           , phoenix::placeholders::arg1));
-        _m_pfds.erase(fusion::at_c<0>(itr_tuple), fusion::at_c<0>(end_tuple));
-        _m_ctxitr.erase(fusion::at_c<1>(itr_tuple), fusion::at_c<1>(end_tuple));
+        _m_pfds.erase(boost::get<1>(itr_tuple), boost::get<1>(end_tuple));
+        _m_ctxitr.erase(boost::get<2>(itr_tuple), boost::get<2>(end_tuple));
     }
 
     void
@@ -260,8 +283,38 @@ private:
 
 } } } // namespace boost::mmm::detail
 
-#undef boost_mmm_make_tuple
-#undef BOOST_MMM_TUPLE
+namespace std {
+
+// This is specialized iterator_traits for Boost.Iterator's zip_iterator. The
+// zip_iterator of category is input iterator even though traversal category
+// is grater than forward traversal category and not single pass iterator.
+// This behavior is expected and caused by iterator_facade_default_category of
+// iterator_facade using is_reference to detect reference type. Note,
+// zip_iterator::reference is tuple of each reference of iterator.
+template <typename Category, typename Iterator1, typename Iterator2>
+struct iterator_traits<
+  boost::zip_iterator<boost::tuple<
+    boost::mmm::detail::specialization_guard_iterator<Category>
+  , Iterator1
+  , Iterator2> > >
+{
+private:
+    typedef
+      boost::zip_iterator<boost::tuple<
+        boost::mmm::detail::specialization_guard_iterator<Category>
+      , Iterator1
+      , Iterator2> >
+    zip_iterator;
+
+public:
+    typedef typename zip_iterator::value_type      value_type;
+    typedef typename zip_iterator::reference       reference;
+    typedef typename zip_iterator::pointer         pointer;
+    typedef typename zip_iterator::difference_type difference_type;
+    typedef Category                               iterator_category;
+}; // template <> struct iterator_traits<zip_iterator>
+
+} // namespace std
 
 #endif
 
