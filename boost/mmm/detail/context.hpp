@@ -9,6 +9,9 @@
 #include <boost/mmm/detail/move.hpp>
 #include <boost/context/context.hpp>
 
+#include <stdexcept>
+#include <boost/throw_exception.hpp>
+
 #include <boost/utility/swap.hpp>
 
 #include <boost/mmm/io/detail/poll.hpp>
@@ -41,6 +44,15 @@ public:
 
     virtual bool
     done() const = 0;
+
+    virtual bool
+    is_aggregatable() const { return false; }
+
+    virtual pollfd
+    get_pollfd() const
+    {
+        BOOST_THROW_EXCEPTION(std::runtime_error("non-supported operation"));
+    }
 
 private:
     event_type::type _m_event;

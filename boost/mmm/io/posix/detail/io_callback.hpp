@@ -48,6 +48,21 @@ public:
     virtual bool
     done() const { return get_result() != boost::none; }
 
+    virtual bool
+    is_aggregatable() const { return true; }
+
+    virtual pollfd
+    get_pollfd() const
+    {
+        pollfd pfd =
+        {
+          /*.fd      =*/ get_fd()
+        , /*.events  =*/ get_events()
+        , /*.revents =*/ 0
+        };
+        return pfd;
+    }
+
 private:
     int                          _m_fd;
     boost::optional<result_type> _m_result;

@@ -239,16 +239,8 @@ class async_io_thread : private noncopyable
         }
         for (iterator end = _m_ctxact.end(); ++itr != end; )
         {
-            // FIXME
-            //callbacks::cb_data &data = *static_cast<asio_context &>(*itr).data;
-            //pollfd pfd =
-            //{
-            //  /*.fd      =*/ data.fd
-            //, /*.events  =*/ data.events
-            //, /*.revents =*/ 0
-            //};
             _m_ctxitr.push_back(itr);
-            //_m_pfds.push_back(pfd);
+            _m_pfds.push_back(fusion::at_c<1>(*itr)->get_pollfd());
         }
         BOOST_ASSERT(_m_ctxact.size() == _m_ctxitr.size());
         BOOST_ASSERT(_m_ctxact.size() == _m_pfds.size());

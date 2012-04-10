@@ -196,7 +196,7 @@ private:
         io_callback_base *&callback = fusion::at_c<1>(ctx);
         if (callback && !callback->done())
         {
-            if (!data.async_pool)
+            if (!data.async_pool || !callback->is_aggregatable())
             {
                 system::error_code err_code;
                 if (callback->check_events(err_code))
@@ -212,7 +212,7 @@ private:
         fusion::at_c<0>(ctx).resume();
         current_context::set_current_ctx(0);
 
-        if (data.async_pool && callback)
+        if (data.async_pool && callback && callback->is_aggregatable())
         {
             data.async_pool->push_ctx(move(ctx));
         }
