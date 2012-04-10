@@ -19,6 +19,7 @@
 #include <boost/container/list.hpp>
 
 #include <boost/mmm/detail/thread.hpp>
+#include <boost/mmm/detail/context.hpp>
 
 #include <boost/phoenix/core.hpp>
 #include <boost/phoenix/operator/self.hpp>
@@ -39,8 +40,8 @@
 
 #include <boost/chrono/duration.hpp>
 #include <boost/system/error_code.hpp>
+#include <boost/mmm/detail/array_ref/container.hpp>
 #include <boost/mmm/io/detail/poll.hpp>
-#include <boost/mmm/detail/context.hpp>
 
 namespace boost { namespace mmm { namespace detail {
 
@@ -130,7 +131,7 @@ class async_io_thread : private noncopyable
     {
         unique_unlock<mutex> unguard(guard);
         using io::detail::poll_fds;
-        return poll_fds(_m_pfds.data(), _m_pfds.size(), poll_TO, err_code);
+        return poll_fds(make_array_ref(_m_pfds), poll_TO, err_code);
     }
 
     template <typename Rep, typename Period>
@@ -234,15 +235,16 @@ class async_io_thread : private noncopyable
         _m_pending_ctxs.clear();
         for (iterator end = _m_ctxact.end(); ++itr != end; )
         {
-            callbacks::cb_data &data = *static_cast<asio_context &>(*itr).data;
-            pollfd pfd =
-            {
-              /*.fd      =*/ data.fd
-            , /*.events  =*/ data.events
-            , /*.revents =*/ 0
-            };
+            // FIXME
+            //callbacks::cb_data &data = *static_cast<asio_context &>(*itr).data;
+            //pollfd pfd =
+            //{
+            //  /*.fd      =*/ data.fd
+            //, /*.events  =*/ data.events
+            //, /*.revents =*/ 0
+            //};
             _m_ctxitr.push_back(itr);
-            _m_pfds.push_back(pfd);
+            //_m_pfds.push_back(pfd);
         }
     }
 

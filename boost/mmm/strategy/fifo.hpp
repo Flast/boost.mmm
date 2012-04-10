@@ -11,6 +11,7 @@
 #include <boost/preprocessor/stringize.hpp>
 
 #include <boost/assert.hpp>
+#include <boost/fusion/include/at.hpp>
 
 #include <boost/intrusive/detail/mpl.hpp>
 #if !defined(BOOST_MMM_CONTAINER_HAS_NO_ALLOCATOR_TRAITS)
@@ -79,7 +80,8 @@ struct strategy_traits<strategy::fifo, Context, Allocator>
     void
     push_ctx(SchedulerTraits traits, context_type ctx)
     {
-        BOOST_ASSERT(ctx && !ctx.is_complete());
+        using fusion::at_c;
+        BOOST_ASSERT(at_c<0>(ctx) && !at_c<0>(ctx).is_complete());
         pool_type &pool = traits.pool();
 
         // Call boost::move via ADL

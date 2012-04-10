@@ -6,138 +6,94 @@
 #ifndef BOOST_MMM_DETAIL_CONTEXT_HPP
 #define BOOST_MMM_DETAIL_CONTEXT_HPP
 
-#include <boost/config.hpp>
-
-#include <cstddef>
-#include <algorithm>
-#if !defined(BOOST_NO_RVALUE_REFERENCES)
-#include <utility>
-#   if defined(BOOST_NO_VARIADIC_TEMPLATES)
-#   include <boost/preprocessor/cat.hpp>
-#   endif
-#endif
-
 #include <boost/mmm/detail/move.hpp>
 #include <boost/context/context.hpp>
 
-#if defined(BOOST_NO_VARIADIC_TEMPLATES)
-#include <boost/preprocessor/arithmetic/add.hpp>
-#include <boost/preprocessor/repetition/repeat_from_to.hpp>
-#include <boost/preprocessor/repetition/enum_params.hpp>
-#include <boost/preprocessor/repetition/enum_binary_params.hpp>
-#endif
+#include <boost/utility/swap.hpp>
+
+#include <boost/mmm/io/detail/poll.hpp>
+
+#include <boost/fusion/include/adapt_struct.hpp>
 
 namespace boost { namespace mmm { namespace detail {
 
-struct callbacks
+class io_callback_base
 {
-    struct cb_data
-    {
-        int   fd;
-        short events;
-        void  *data;
-    }; // struct cb_data
-    void *(*callback)(cb_data *);
-    cb_data *data;
+protected:
+    typedef io::detail::polling_events event_type;
 
-    callbacks()
-      : callback(0), data(0) {}
+    explicit
+    io_callback_base(event_type::type event)
+      : _m_event(event) {}
 
-    void
-    swap(callbacks &other)
-    {
-        using std::swap;
-        swap(callback, other.callback);
-        swap(data    , other.data);
-    }
-}; // struct callbacks
-
-inline void
-swap(callbacks &l, callbacks &r)
-{
-    l.swap(r);
-}
-
-class asio_context
-  : public contexts::context
-  , public callbacks
-{
-    typedef contexts::context _ctx_base_t;
-    typedef callbacks         _cb_base_t;
-
-    BOOST_MOVABLE_BUT_NOT_COPYABLE(asio_context)
+    event_type::type
+    get_events() const { return _m_event; }
 
 public:
-    asio_context() {}
+    virtual
+    ~io_callback_base() {}
 
-    // Inheriting ctors...
-//#if defined(BOOST_NO_INHERITING_CTORS)
-#if defined(BOOST_NO_VARIADIC_TEMPLATES)
-#   if defined(BOOST_NO_RVALUE_REFERENCES)
-#define BOOST_MMM_asio_context_forward(unused_z_, n_, unused_data_)
-#define BOOST_MMM_asio_context_inheriting_ctor(unused_z_, n_, unused_data_) \
-    template <BOOST_PP_ENUM_PARAMS(n_, typename Arg)>       \
-    explicit                                                \
-    asio_context(BOOST_PP_ENUM_BINARY_PARAMS(n_, Arg, arg)) \
-      : _ctx_base_t(BOOST_PP_ENUM_PARAMS(n_, arg)) {}       \
-// BOOST_MMM_asio_context_inheriting_ctor
-#   else
-#define BOOST_MMM_asio_context_forward(unused_z_, n_, unused_data_) \
-    std::forward<BOOST_PP_CAT(Arg, n_)>(BOOST_PP_CAT(arg, n_))
-#define BOOST_MMM_asio_context_inheriting_ctor(unused_z_, n_, unused_data_) \
-    template <BOOST_PP_ENUM_PARAMS(n_, typename Arg)>                       \
-    explicit                                                                \
-    asio_context(BOOST_PP_ENUM_BINARY_PARAMS(n_, Arg, &&arg))               \
-      : _ctx_base_t(BOOST_PP_ENUM(n_, BOOST_MMM_asio_context_forward, ~)) {} \
-// BOOST_MMM_asio_context_inheriting_ctor
-#   endif
-BOOST_PP_REPEAT_FROM_TO(4, BOOST_PP_ADD(BOOST_CONTEXT_ARITY, 5)
-, BOOST_MMM_asio_context_inheriting_ctor, ~)
-#undef BOOST_MMM_asio_context_inheriting_ctor
-#undef BOOST_MMM_asio_context_forward
-#else // BOOST_NO_VARIADIC_TEMPLATES
-#   if defined(BOOST_NO_RVALUE_REFERENCES)
-    template <typename... Args>
+    virtual void
+    operator()() = 0;
+
+    virtual bool
+    check_events(system::error_code &) const = 0;
+
+    virtual bool
+    done() const = 0;
+
+private:
+    event_type::type _m_event;
+}; // class io_callback_base
+
+struct context_tuple
+{
+    BOOST_MOVABLE_BUT_NOT_COPYABLE(context_tuple)
+
+public:
+    typedef contexts::context context_type;
+
+    context_tuple() : _m_ctx(), _m_io_callback() {}
+
     explicit
-    asio_context(Args... args)
-      : _ctx_base_t(args...) {}
-#   else
-    template <typename... Args>
-    explicit
-    asio_context(Args &&... args)
-      : _ctx_base_t(std::forward<Args>(args)...) {}
-#   endif
-#endif
-//#else
-//    using _ctx_base_t::_ctx_base_t;
-//#endif
+    context_tuple(BOOST_RV_REF(context_type) ctx, io_callback_base *callback)
+      : _m_ctx(move(ctx)), _m_io_callback(callback) {}
 
-    asio_context(BOOST_RV_REF(asio_context) other)
-      : _ctx_base_t(boost::move(static_cast<_ctx_base_t &>(other)))
-      , _cb_base_t(other) {}
+    context_tuple(BOOST_RV_REF(context_tuple) other)
+      : _m_ctx(move(other._m_ctx))
+      , _m_io_callback(other._m_io_callback) {}
 
-    asio_context &
-    operator=(BOOST_RV_REF(asio_context) other)
+    context_tuple &
+    operator=(BOOST_RV_REF(context_tuple) other)
     {
-        asio_context(boost::move(other)).swap(*this);
+        context_tuple(move(other)).swap(*this);
         return *this;
     }
 
     void
-    swap(asio_context &other)
+    swap(context_tuple &other)
     {
-        _ctx_base_t::swap(other);
-        _cb_base_t::swap(other);
+        boost::swap(_m_ctx          , other._m_ctx);
+        boost::swap(_m_io_callback, other._m_io_callback);
     }
-}; // class asio_context
+
+    context_type     _m_ctx;
+    io_callback_base *_m_io_callback;
+}; // struct context_tuple
 
 inline void
-swap(asio_context &l, asio_context &r)
+swap(context_tuple &l, context_tuple &r)
 {
     l.swap(r);
 }
 
 } } } // namespace boost::mmm::detail
+
+BOOST_FUSION_ADAPT_STRUCT(
+  boost::mmm::detail::context_tuple
+, (boost::mmm::detail::context_tuple::context_type, _m_ctx)
+  (boost::mmm::detail::io_callback_base *         , _m_io_callback)
+  )
 
 #endif // BOOST_MMM_DETAIL_CONTEXT_HPP
 
