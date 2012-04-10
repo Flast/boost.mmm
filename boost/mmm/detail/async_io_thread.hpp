@@ -31,6 +31,7 @@
 #include <cstddef>
 #include <boost/iterator/zip_iterator.hpp>
 #include <boost/tuple/tuple.hpp>
+#include <boost/fusion/include/boost_tuple.hpp>
 
 #include <boost/atomic.hpp>
 #include <boost/thread/mutex.hpp>
@@ -110,9 +111,14 @@ class async_io_thread : private noncopyable
 
     struct check_event
     {
-        template <typename GuardIterator, typename ActIterator>
+        struct ignore
+        {
+            template <typename T>
+            ignore(const T &) {}
+        };
+
         bool
-        operator()(tuple<GuardIterator, const pollfd &, ActIterator> pfd) const
+        operator()(tuple<ignore, const pollfd &, ignore> pfd) const
         {
             return boost::get<1>(pfd).revents == 0;
         }
