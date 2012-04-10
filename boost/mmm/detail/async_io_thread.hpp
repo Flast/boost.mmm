@@ -17,6 +17,8 @@
 #endif
 #include <boost/container/vector.hpp>
 #include <boost/container/list.hpp>
+#include <boost/range/begin.hpp>
+#include <boost/range/end.hpp>
 
 #include <boost/mmm/detail/thread.hpp>
 #include <boost/mmm/detail/context.hpp>
@@ -224,15 +226,17 @@ class async_io_thread : private noncopyable
     void
     import_pendings()
     {
-        if (_m_pending_ctxs.size() == 0) { return; }
-
         typedef typename ctxact_vector::iterator iterator;
+
+        // Should decrement end iterator due to some end iterator uses special
+        // version.
         iterator itr = --_m_ctxact.end();
-        for (iterator i = _m_pending_ctxs.begin(), end = _m_pending_ctxs.end(); i != end; ++i)
+        if (_m_pending_ctxs.size() != 0)
         {
-            _m_ctxact.push_back(move(*i));
+            lock_guard<mutex> guard(_m_mtx);
+            move(begin(_m_pending_ctxs), end(_m_pending_ctxs), back_move_inserter(_m_ctxact));
+            _m_pending_ctxs.clear();
         }
-        _m_pending_ctxs.clear();
         for (iterator end = _m_ctxact.end(); ++itr != end; )
         {
             // FIXME
@@ -246,6 +250,8 @@ class async_io_thread : private noncopyable
             _m_ctxitr.push_back(itr);
             //_m_pfds.push_back(pfd);
         }
+        BOOST_ASSERT(_m_ctxact.size() == _m_ctxitr.size());
+        BOOST_ASSERT(_m_ctxact.size() == _m_pfds.size());
     }
 
 public:
