@@ -42,7 +42,7 @@ public:
     check_events(system::error_code &err_code) const
     {
         using io::detail::check_events;
-        return check_events(get_fd(), get_events(), err_code);
+        return check_events(get_fd(), get_events(), err_code) & get_events();
     }
 
     virtual bool
