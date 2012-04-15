@@ -50,7 +50,7 @@
 #include <boost/interprocess/smart_ptr/unique_ptr.hpp>
 
 #if !defined(BOOST_MMM_CONTAINER_HAS_NO_ALLOCATOR_TRAITS)
-#include <boost/container/allocator/allocator_traits.hpp>
+#include BOOST_MMM_CONTAINER_ALLOCATOR_TRAITS_HEADER
 #endif
 #include <functional>
 #if defined(BOOST_MMM_THREAD_SUPPORTS_HASHABLE_THREAD_ID) \
