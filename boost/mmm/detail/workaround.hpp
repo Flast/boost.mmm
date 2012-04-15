@@ -31,6 +31,13 @@
 
 #endif
 
+// Boost.Container's allocator_traits.hpp will be moved in 1.50.0 release.
+#if BOOST_VERSION < 105000
+#   define BOOST_MMM_CONTAINER_ALLOCATOR_TRAITS_HEADER "boost/container/allocator/allocator_traits.hpp"
+#else
+#   define BOOST_MMM_CONTAINER_ALLOCATOR_TRAITS_HEADER "boost/container/allocator_traits.hpp"
+#endif
+
 // Currently(after Boost 1.48.0), Boost has Move Semantics emulator library: Boost.Move.
 // But Boost.Thread implements Move Semantics with original implementations.
 #if defined(BOOST_THREAD_USES_MOVE)
