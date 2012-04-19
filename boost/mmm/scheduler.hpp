@@ -229,7 +229,7 @@ public:
      *
      * <b>Throws</b>: Nothing.
      */
-    scheduler(BOOST_RV_REF(scheduler) other)
+    scheduler(BOOST_RV_REF(scheduler) other) BOOST_NOEXCEPT
       : _m_data(move(other._m_data)) {}
 
     /**

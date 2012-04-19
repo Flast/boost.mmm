@@ -44,15 +44,15 @@ public:
     }
 
     explicit
-    unique_unlock(BOOST_RV_REF(unique_unlock) x)
+    unique_unlock(BOOST_RV_REF(unique_unlock) other) BOOST_NOEXCEPT
     {
-        swap(x);
+        swap(other);
     }
 
     unique_unlock &
-    operator=(BOOST_RV_REF(unique_unlock) x)
+    operator=(BOOST_RV_REF(unique_unlock) other) BOOST_NOEXCEPT
     {
-        unique_unlock(move(x)).swap(*this);
+        unique_unlock(move(other)).swap(*this);
         return *this;
     }
 

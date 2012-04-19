@@ -50,7 +50,7 @@ public:
     thread() {}
 
     // Using Boost.Thread's Move Semantics to move.
-    thread(BOOST_RV_REF(thread) other)
+    thread(BOOST_RV_REF(thread) other) BOOST_NOEXCEPT
       : _base_t(other.move()) {}
 
 #if defined(BOOST_NO_VARIADIC_TEMPLATES)
@@ -70,7 +70,7 @@ public:
 #endif
 
     thread &
-    operator=(BOOST_RV_REF(thread) other)
+    operator=(BOOST_RV_REF(thread) other) BOOST_NOEXCEPT
     {
         _base_t::operator=(other.move());
         return *this;
