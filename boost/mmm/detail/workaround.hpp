@@ -44,14 +44,7 @@
 #   define BOOST_MMM_THREAD_SUPPORTS_MOVE_BASED_MOVE
 #endif
 
-// Boost.Thread's future will rename to future in Thread v2.
-#if BOOST_THREAD_VERSION == 1
-#   define BOOST_MMM_THREAD_FUTURE ::boost::unique_future
-#elif defined(BOOST_THREAD_FUTURE)
-#   define BOOST_MMM_THREAD_FUTURE ::boost::BOOST_THREAD_FUTURE
-#else
-#   define BOOST_MMM_THREAD_FUTURE ::boost::future
-#endif
+#define BOOST_MMM_THREAD_FUTURE ::boost::mmm::BOOST_THREAD_FUTURE
 
 #endif
 

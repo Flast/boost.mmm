@@ -38,7 +38,7 @@
 #include <boost/mmm/detail/thread.hpp>
 #include <boost/context/context.hpp>
 #include <boost/context/stack_utils.hpp>
-#include <boost/thread/future.hpp>
+#include <boost/mmm/detail/future.hpp>
 #include <boost/utility/result_of.hpp>
 
 #include <boost/atomic.hpp>
@@ -216,7 +216,7 @@ private:
         using namespace detail;
 
         current_context::set_current_ctx(&ctx);
-        BOOST_MMM_THREAD_FUTURE<T> f = reinterpret_cast<promise<T> *>(ctx.start())->get_future();
+        BOOST_MMM_THREAD_FUTURE<T> f(reinterpret_cast<promise<T> *>(ctx.resume())->get_future());
         current_context::set_current_ctx(0);
         return move(f);
     }
@@ -261,7 +261,6 @@ public:
 #if !defined(BOOST_MMM_CONTAINER_BREAKING_EMPLACE_RETURN_TYPE)
             std::pair<typename kernels_type::iterator, bool> r =
 #endif
-            // Call Boost.Move's boost::move via ADL
             _m_data->kernels.emplace(th.get_id(), move(th));
 #if !defined(BOOST_MMM_CONTAINER_BREAKING_EMPLACE_RETURN_TYPE)
             BOOST_ASSERT(r.second);

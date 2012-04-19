@@ -42,7 +42,7 @@ class BOOST_THREAD_DECL thread : public boost::thread
 
     // Ignoring original impls
 #if defined(BOOST_NO_RVALUE_REFERENCES)
-    using _base_t::operator boost::detail::thread_move_t<boost::thread>;
+    using _base_t::operator BOOST_THREAD_RV_REF(boost::thread);
 #endif
     using _base_t::move;
 
@@ -50,9 +50,8 @@ public:
     thread() {}
 
     // Using Boost.Thread's Move Semantics to move.
-    explicit
-    thread(BOOST_RV_REF(thread) x)
-      : _base_t(x.move()) {}
+    thread(BOOST_RV_REF(thread) other)
+      : _base_t(other.move()) {}
 
 #if defined(BOOST_NO_VARIADIC_TEMPLATES)
 #define BOOST_MMM_thread_variadic_ctor(unused_r_, n_, unused_data_) \
@@ -71,9 +70,9 @@ public:
 #endif
 
     thread &
-    operator=(BOOST_RV_REF(thread) x)
+    operator=(BOOST_RV_REF(thread) other)
     {
-        _base_t::operator=(x.move());
+        _base_t::operator=(other.move());
         return *this;
     }
 }; // class thread
