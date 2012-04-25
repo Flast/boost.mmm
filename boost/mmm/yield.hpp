@@ -6,7 +6,7 @@
 #ifndef BOOST_MMM_YIELD_HPP
 #define BOOST_MMM_YIELD_HPP
 
-#include <boost/context/context.hpp>
+#include <boost/mmm/detail/context.hpp>
 #include <boost/mmm/detail/current_context.hpp>
 
 namespace boost { namespace mmm { namespace this_ctx {
@@ -19,7 +19,7 @@ inline void
 yield()
 {
     using namespace detail::current_context;
-    if (contexts::context *ctx = get_current_ctx())
+    if (detail::context *ctx = get_current_ctx())
     {
         ctx->suspend();
     }

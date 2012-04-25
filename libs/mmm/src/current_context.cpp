@@ -15,7 +15,7 @@ using namespace std;
 #include <boost/thread/shared_mutex.hpp>
 #include <boost/thread/locks.hpp>
 
-#include <boost/context/context.hpp>
+#include <boost/mmm/detail/context.hpp>
 
 #if defined(BOOST_MMM_THREAD_SUPPORTS_HASHABLE_THREAD_ID) \
  && defined(BOOST_UNORDERED_USE_MOVE)
@@ -34,7 +34,7 @@ typedef
 #else
   container::flat_map
 #endif
-    <thread::id, contexts::context *>
+    <thread::id, context *>
 context_map_type;
 
 namespace {
@@ -43,7 +43,7 @@ context_map_type _ctxmap;
 } // anonymous namespace
 
 void
-set_current_ctx(contexts::context *ctx)
+set_current_ctx(context *ctx)
 {
     const thread::id tid = this_thread::get_id();
 
@@ -68,7 +68,7 @@ set_current_ctx(contexts::context *ctx)
     BOOST_MMM_DETAIL_UNUSED(r);
 }
 
-contexts::context *
+context *
 get_current_ctx()
 {
     const thread::id tid = this_thread::get_id();
