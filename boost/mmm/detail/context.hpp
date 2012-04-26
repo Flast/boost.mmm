@@ -43,7 +43,7 @@ struct context_exception : public std::logic_error
 {
     context_exception(const std::string &v)
       : std::logic_error(v) {}
-};
+}; // struct context_exception
 
 struct context
 {
@@ -64,7 +64,7 @@ private:
           , context_status_run
           , context_status_suspend
           , context_status_done
-        };
+        }; // enum status_t
 
         static void
         _m_executer(intptr_t this_)
@@ -235,7 +235,13 @@ public:
 
 private:
     unique_ptr_<context_data_>::type _m_data;
-};
+}; // struct context
+
+inline void
+swap(context &left, context &right) BOOST_NOEXCEPT
+{
+    left.swap(right);
+}
 
 class io_callback_base
 {
