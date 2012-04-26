@@ -34,10 +34,10 @@
 #include <boost/utility/enable_if.hpp>
 #include <boost/type_traits/is_same.hpp>
 
-#include <boost/mmm/detail/thread.hpp>
 #include <boost/mmm/detail/context.hpp>
-#include <boost/context/stack_utils.hpp>
+#include <boost/mmm/detail/thread.hpp>
 #include <boost/fusion/include/at.hpp>
+#include <boost/phoenix/bind/bind_function_object.hpp>
 
 #include <boost/system/error_code.hpp>
 
@@ -68,6 +68,10 @@
 #include <boost/mmm/detail/context_guard.hpp>
 #include <boost/mmm/strategy_traits.hpp>
 #include <boost/mmm/scheduler_traits.hpp>
+
+#if !defined(BOOST_MMM_SCHEDULER_MAX_ARITY)
+#   define BOOST_MMM_SCHEDULER_MAX_ARITY 10
+#endif
 
 namespace boost { namespace mmm {
 
@@ -258,6 +262,8 @@ private:
     // about the context was started.
     struct context_starter
     {
+        typedef void result_type;
+
         reference_wrapper<context_type> _m_ctx;
 
         explicit
@@ -274,7 +280,7 @@ private:
             fn(BOOST_PP_ENUM_PARAMS(n_, arg));                          \
         }                                                               \
 // BOOST_MMM_context_starter_op_call
-        BOOST_PP_REPEAT(BOOST_PP_INC(BOOST_CONTEXT_ARITY), BOOST_MMM_context_starter_op_call, ~)
+        BOOST_PP_REPEAT(BOOST_PP_INC(BOOST_MMM_SCHEDULER_MAX_ARITY), BOOST_MMM_context_starter_op_call, ~)
 #undef BOOST_MMM_context_starter_op_call
 #else
         template <typename Fn, typename... Args>
@@ -293,7 +299,7 @@ private:
         using namespace detail;
 
         current_context::set_current_ctx(&ctx);
-        fusion::at_c<0>(ctx).start();
+        fusion::at_c<0>(ctx).resume();
         current_context::set_current_ctx(0);
     }
 #endif
@@ -413,7 +419,7 @@ public:
     {                                                                       \
         BOOST_ASSERT(_m_data);                                              \
         add_thread<Fn & BOOST_PP_ENUM_TRAILING_BINARY_PARAMS(n_, Arg, & BOOST_PP_INTERCEPT)>( \
-          contexts::default_stacksize()                                     \
+          ctx::default_stacksize()                                          \
         , fn BOOST_PP_ENUM_TRAILING_PARAMS(n_, arg));                       \
     }                                                                       \
                                                                             \
@@ -422,13 +428,13 @@ public:
     add_thread(size_type size, Fn fn BOOST_PP_ENUM_TRAILING_BINARY_PARAMS(n_, Arg, arg)) \
     {                                                                       \
         BOOST_ASSERT(_m_data);                                              \
-        using contexts::no_stack_unwind;                                    \
-        using contexts::return_to_caller;                                   \
                                                                             \
         context_type ctx;                                                   \
-        contexts::context(                                                  \
-          context_starter(ctx), fn BOOST_PP_ENUM_TRAILING_PARAMS(n_, arg)   \
-        , size, no_stack_unwind, return_to_caller).swap(fusion::at_c<0>(ctx)); \
+        detail::context(                                                    \
+          phoenix::bind(                                                    \
+            context_starter(ctx)                                            \
+          , fn BOOST_PP_ENUM_TRAILING_PARAMS(n_, arg))                      \
+        , size).swap(fusion::at_c<0>(ctx));                                 \
         start_context(ctx);                                                 \
                                                                             \
         unique_lock<mutex> guard(_m_data->mtx);                             \
@@ -436,7 +442,7 @@ public:
         _m_data->cond.notify_one();                                         \
     }                                                                       \
 // BOOST_MMM_scheduler_add_thread
-    BOOST_PP_REPEAT(BOOST_PP_INC(BOOST_CONTEXT_ARITY), BOOST_MMM_scheduler_add_thread, ~)
+    BOOST_PP_REPEAT(BOOST_PP_INC(BOOST_MMM_SCHEDULER_MAX_ARITY), BOOST_MMM_scheduler_add_thread, ~)
 #undef BOOST_MMM_scheduler_add_thread
 #else
     /**
@@ -456,7 +462,7 @@ public:
     add_thread(Fn fn, Args... args)
     {
         BOOST_ASSERT(_m_data);
-        using contexts::default_stacksize;
+        using ctx::default_stacksize;
         add_thread<Fn &, Args &...>(default_stacksize(), fn, args...);
     }
 
@@ -473,13 +479,11 @@ public:
     add_thread(size_type size, Fn fn, Args... args)
     {
         BOOST_ASSERT(_m_data);
-        using contexts::no_stack_unwind;
-        using contexts::return_to_caller;
 
         context_type ctx;
-        contexts::context(
-          context_starter(ctx), fn, args...
-        , size, no_stack_unwind, return_to_caller).swap(fusion::at_c<0>(ctx));
+        detail::context(
+          phoenix::bind(context_starter(ctx), fn, args...)
+        , size).swap(fusion::at_c<0>(ctx));
         start_context(ctx);
 
         unique_lock<mutex> guard(_m_data->mtx);
