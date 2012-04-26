@@ -6,14 +6,14 @@
 #ifndef BOOST_MMM_DETAIL_CURRENT_CONTEXT_HPP
 #define BOOST_MMM_DETAIL_CURRENT_CONTEXT_HPP
 
-#include <boost/context/context.hpp>
+#include <boost/mmm/detail/context.hpp>
 
 namespace boost { namespace mmm { namespace detail { namespace current_context {
 
 void
-set_current_ctx(contexts::context *);
+set_current_ctx(context *);
 
-contexts::context *
+context *
 get_current_ctx();
 
 } } } } // namespace boost::mmm::detail::current_context

@@ -35,11 +35,11 @@
 #include <boost/utility/enable_if.hpp>
 #include <boost/type_traits/is_same.hpp>
 
+#include <boost/mmm/detail/context.hpp>
 #include <boost/mmm/detail/thread.hpp>
-#include <boost/context/context.hpp>
-#include <boost/context/stack_utils.hpp>
 #include <boost/mmm/detail/future.hpp>
 #include <boost/utility/result_of.hpp>
+#include <boost/phoenix/bind/bind_function_object.hpp>
 
 #include <boost/atomic.hpp>
 #include <boost/thread/condition_variable.hpp>
@@ -65,6 +65,10 @@
 #include <boost/mmm/detail/context_guard.hpp>
 #include <boost/mmm/strategy_traits.hpp>
 #include <boost/mmm/scheduler_traits.hpp>
+
+#if !defined(BOOST_MMM_SCHEDULER_MAX_ARITY)
+#   define BOOST_MMM_SCHEDULER_MAX_ARITY 10
+#endif
 
 namespace boost { namespace mmm {
 
@@ -145,7 +149,7 @@ private:
 #endif
     typedef mmm::scheduler_traits<this_type> scheduler_traits;
     typedef
-      mmm::strategy_traits<strategy_type, contexts::context, allocator_type>
+      mmm::strategy_traits<strategy_type, detail::context, allocator_type>
     strategy_traits;
 
     typedef detail::scheduler_data<strategy_traits, allocator_type> scheduler_data;
@@ -313,7 +317,7 @@ public:
     {                                                                       \
         BOOST_ASSERT(_m_data);                                              \
         return add_thread<Fn & BOOST_PP_ENUM_TRAILING_BINARY_PARAMS(n_, Arg, & BOOST_PP_INTERCEPT)>( \
-          contexts::default_stacksize()                                     \
+          ctx::default_stacksize()                                          \
         , fn BOOST_PP_ENUM_TRAILING_PARAMS(n_, arg));                       \
     }                                                                       \
                                                                             \
@@ -322,8 +326,6 @@ public:
     add_thread(size_type size, Fn fn BOOST_PP_ENUM_TRAILING_BINARY_PARAMS(n_, Arg, arg)) \
     {                                                                       \
         BOOST_ASSERT(_m_data);                                              \
-        using contexts::no_stack_unwind;                                    \
-        using contexts::return_to_caller;                                   \
                                                                             \
         typedef typename remove_reference<Fn>::type fn_type;                \
         typedef typename                                                    \
@@ -332,8 +334,10 @@ public:
                                                                             \
         context_type ctx;                                                   \
         context_type(                                                       \
-          context_starter<fn_result_type>(ctx), fn BOOST_PP_ENUM_TRAILING_PARAMS(n_, arg) \
-        , size, no_stack_unwind, return_to_caller).swap(ctx);               \
+          phoenix::bind(                                                    \
+            context_starter<fn_result_type>(ctx)                            \
+          , fn BOOST_PP_ENUM_TRAILING_PARAMS(n_, arg))                      \
+        , size).swap(ctx);                                                  \
         BOOST_MMM_THREAD_FUTURE<fn_result_type> f = start_context<fn_result_type>(ctx); \
                                                                             \
         unique_lock<mutex> guard(_m_data->mtx);                             \
@@ -342,7 +346,7 @@ public:
         return move(f);                                                     \
     }                                                                       \
 // BOOST_MMM_scheduler_add_thread
-    BOOST_PP_REPEAT(BOOST_PP_INC(BOOST_CONTEXT_ARITY), BOOST_MMM_scheduler_add_thread, ~)
+    BOOST_PP_REPEAT(BOOST_PP_INC(BOOST_MMM_SCHEDULER_MAX_ARITY), BOOST_MMM_scheduler_add_thread, ~)
 #undef BOOST_MMM_scheduler_add_thread
 #undef BOOST_MMM_enum_rmref_params
 #else
@@ -367,7 +371,7 @@ public:
     add_thread(Fn fn, Args... args)
     {
         BOOST_ASSERT(_m_data);
-        using contexts::default_stacksize;
+        using ctx::default_stacksize;
         return add_thread<Fn &, Args &...>(default_stacksize(), fn, args...);
     }
 
@@ -390,8 +394,6 @@ public:
     add_thread(size_type size, Fn fn, Args... args)
     {
         BOOST_ASSERT(_m_data);
-        using contexts::no_stack_unwind;
-        using contexts::return_to_caller;
 
         typedef typename detail::function_to_functor<Fn>::type fn_type;
         typedef typename
@@ -400,8 +402,8 @@ public:
 
         context_type ctx;
         context_type(
-          context_starter<fn_result_type>(ctx), fn, args...
-        , size, no_stack_unwind, return_to_caller).swap(ctx);
+          phoenix::bind(context_starter<fn_result_type>(ctx), fn, args...)
+        , size).swap(ctx);
         BOOST_MMM_THREAD_FUTURE<fn_result_type> f = start_context<fn_result_type>(ctx);
 
         unique_lock<mutex> guard(_m_data->mtx);
@@ -504,6 +506,8 @@ template <typename Strategy, typename Allocator>
 template <typename R, typename>
 struct scheduler<Strategy, Allocator>::context_starter
 {
+    typedef void result_type;
+
     typedef typename scheduler<Strategy, Allocator>::context_type context_type;
     reference_wrapper<context_type> _m_ctx;
 
@@ -522,7 +526,7 @@ struct scheduler<Strategy, Allocator>::context_starter
         p.set_value(fn(BOOST_PP_ENUM_PARAMS(n_, arg)));                 \
     }                                                                   \
 // BOOST_MMM_context_starter_op_call
-    BOOST_PP_REPEAT(BOOST_PP_INC(BOOST_CONTEXT_ARITY), BOOST_MMM_context_starter_op_call, ~)
+    BOOST_PP_REPEAT(BOOST_PP_INC(BOOST_MMM_SCHEDULER_MAX_ARITY), BOOST_MMM_context_starter_op_call, ~)
 #undef BOOST_MMM_context_starter_op_call
 #else
     template <typename Fn, typename... Args>
@@ -540,6 +544,8 @@ template <typename Strategy, typename Allocator>
 template <typename Dummy>
 struct scheduler<Strategy, Allocator>::context_starter<void, Dummy>
 {
+    typedef void result_type;
+
     typedef typename scheduler<Strategy, Allocator>::context_type context_type;
     reference_wrapper<context_type> _m_ctx;
 
@@ -559,7 +565,7 @@ struct scheduler<Strategy, Allocator>::context_starter<void, Dummy>
         p.set_value();                                                  \
     }                                                                   \
 // BOOST_MMM_context_starter_op_call
-    BOOST_PP_REPEAT(BOOST_PP_INC(BOOST_CONTEXT_ARITY), BOOST_MMM_context_starter_op_call, ~)
+    BOOST_PP_REPEAT(BOOST_PP_INC(BOOST_MMM_SCHEDULER_MAX_ARITY), BOOST_MMM_context_starter_op_call, ~)
 #undef BOOST_MMM_context_starter_op_call
 #else
     template <typename Fn, typename... Args>
