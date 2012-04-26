@@ -306,7 +306,7 @@ public:
     }
 
     void
-    swap(context_tuple &other)
+    swap(context_tuple &other) BOOST_NOEXCEPT
     {
         boost::swap(_m_ctx          , other._m_ctx);
         boost::swap(_m_io_callback, other._m_io_callback);
@@ -317,7 +317,7 @@ public:
 }; // struct context_tuple
 
 inline void
-swap(context_tuple &l, context_tuple &r)
+swap(context_tuple &l, context_tuple &r) BOOST_NOEXCEPT
 {
     l.swap(r);
 }

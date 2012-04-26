@@ -6,6 +6,8 @@
 #ifndef BOOST_MMM_DETAIL_LOCKS_HPP
 #define BOOST_MMM_DETAIL_LOCKS_HPP
 
+#include <boost/config.hpp>
+
 #include <boost/ref.hpp>
 #include <boost/mmm/detail/move.hpp>
 #include <boost/swap.hpp>
@@ -83,7 +85,7 @@ private:
 
 template <typename Mutex>
 inline void
-swap(unique_unlock<Mutex> &a, unique_unlock<Mutex> &b)
+swap(unique_unlock<Mutex> &a, unique_unlock<Mutex> &b) BOOST_NOEXCEPT
 {
     a.swap(b);
 }
