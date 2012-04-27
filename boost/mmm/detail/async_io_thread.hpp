@@ -41,6 +41,9 @@
 #include <boost/mmm/detail/locks.hpp>
 
 #include <boost/chrono/duration.hpp>
+#ifndef BOOST_THREAD_SUPPORTS_SLEEP_FOR
+#include <boost/date_time/posix_time/posix_time_config.hpp>
+#endif
 #include <boost/system/error_code.hpp>
 #include <boost/mmm/detail/array_ref/container.hpp>
 #include <boost/mmm/io/detail/poll.hpp>
@@ -129,11 +132,40 @@ class async_io_thread : private noncopyable
 
     template <typename Duration>
     int
-    polling(unique_lock<mutex> &guard, Duration poll_TO, system::error_code &err_code)
+    polling(Duration poll_TO, system::error_code &err_code)
     {
-        unique_unlock<mutex> unguard(guard);
-        using io::detail::poll_fds;
-        return poll_fds(make_array_ref(_m_pfds), poll_TO, err_code);
+        if (_m_pfds.size())
+        {
+            using io::detail::poll_fds;
+            return poll_fds(make_array_ref(_m_pfds), poll_TO, err_code);
+        }
+
+#ifdef BOOST_THREAD_SUPPORTS_SLEEP_FOR
+        this_thread::sleep_for(poll_TO);
+#else
+        typedef
+#   if defined(BOOST_DATE_TIME_HAS_NANOSECONDS)
+          chrono::nanoseconds
+#   elif defined(BOOST_DATE_TIME_HAS_MICROSECONDS)
+          chrono::microseconds
+#   elif defined(BOOST_DATE_TIME_HAS_MILLISECONDS)
+          chrono::milliseconds
+#   else
+          chrono::seconds
+#   endif
+        fractional_seconds_type;
+
+        const chrono::hours h = chrono::duration_cast<chrono::hours>(poll_TO);
+        poll_TO -= h;
+        const chrono::minutes m = chrono::duration_cast<chrono::minutes>(poll_TO);
+        poll_TO -= m;
+        const chrono::seconds s = chrono::duration_cast<chrono::seconds>(poll_TO);
+        poll_TO -= s;
+        const fractional_seconds_type f = chrono::duration_cast<fractional_seconds_type>(poll_TO);
+
+        this_thread::sleep(posix_time::time_duration(h.count(), m.count(), s.count(), f.count()));
+#endif
+        return 0;
     }
 
     template <typename Rep, typename Period>
@@ -144,13 +176,11 @@ class async_io_thread : private noncopyable
           specialization_guard_iterator<std::random_access_iterator_tag>
         guard_iterator;
 
-        unique_lock<mutex> guard(_m_mtx);
-
         system::error_code err_code;
         while (!_m_terminate)
         {
             import_pendings();
-            const int ret = polling(guard, poll_TO, err_code);
+            const int ret = polling(poll_TO, err_code);
 
             if (!err_code && 0 < ret)
             {
