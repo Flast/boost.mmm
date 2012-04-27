@@ -227,8 +227,7 @@ class async_io_thread : private noncopyable
             static_cast<push_ctx>(&StrategyTraits::push_ctx)
           , boost::ref(_m_strategy_traits)
           , boost::ref(_m_scheduler_traits)
-          , phoenix::move(
-              *phoenix::at_c<2>(phoenix::placeholders::arg1))));
+          , phoenix::move(*phoenix::at_c<2>(phoenix::placeholders::arg1))));
         _m_scheduler_traits.notify_all();
     }
 

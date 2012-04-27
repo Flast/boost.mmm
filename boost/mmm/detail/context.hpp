@@ -296,7 +296,10 @@ public:
 
     context_tuple(BOOST_RV_REF(context_tuple) other)
       : _m_ctx(move(other._m_ctx))
-      , _m_io_callback(other._m_io_callback) {}
+      , _m_io_callback(other._m_io_callback)
+    {
+        other._m_io_callback = initialized_value;
+    }
 
     context_tuple &
     operator=(BOOST_RV_REF(context_tuple) other)
@@ -308,7 +311,7 @@ public:
     void
     swap(context_tuple &other) BOOST_NOEXCEPT
     {
-        boost::swap(_m_ctx          , other._m_ctx);
+        boost::swap(_m_ctx        , other._m_ctx);
         boost::swap(_m_io_callback, other._m_io_callback);
     }
 

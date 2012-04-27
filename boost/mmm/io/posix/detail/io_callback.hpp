@@ -26,7 +26,7 @@ protected:
 
     explicit
     posix_callback(base_type::event_type::type event, int fd)
-      : base_type(event), _m_fd(fd), _m_result(0) {}
+      : base_type(event), _m_fd(fd) {}
 
     void
     set_result(result_type val) { _m_result = val; }

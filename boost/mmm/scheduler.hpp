@@ -198,8 +198,9 @@ private:
         unique_unlock<mutex> unguard(guard);
 
         io_callback_base *&callback = fusion::at_c<1>(ctx);
-        if (callback && !callback->done())
+        if (callback)
         {
+            BOOST_ASSERT(!callback->done());
             if (!data.async_pool || !callback->is_aggregatable())
             {
                 system::error_code err_code;
@@ -210,6 +211,7 @@ private:
                 }
             }
             callback->operator()();
+            if (callback->done()) { callback = initialized_value; }
         }
 
         current_context::set_current_ctx(&ctx);
