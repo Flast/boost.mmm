@@ -46,5 +46,9 @@
 
 #define BOOST_MMM_THREAD_FUTURE ::boost::mmm::BOOST_THREAD_FUTURE
 
+#if defined(BOOST_THREAD_VERSION) && 1 < BOOST_THREAD_VERSION
+#   define BOOST_THREAD_SUPPORTS_SLEEP_FOR
+#endif
+
 #endif
 

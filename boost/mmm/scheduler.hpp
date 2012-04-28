@@ -39,7 +39,10 @@
 #include <boost/mmm/detail/thread.hpp>
 #include <boost/mmm/detail/future.hpp>
 #include <boost/utility/result_of.hpp>
+#include <boost/fusion/include/at.hpp>
 #include <boost/phoenix/bind/bind_function_object.hpp>
+
+#include <boost/system/error_code.hpp>
 
 #include <boost/atomic.hpp>
 #include <boost/thread/condition_variable.hpp>
@@ -48,6 +51,9 @@
 
 #include <boost/checked_delete.hpp>
 #include <boost/interprocess/smart_ptr/unique_ptr.hpp>
+
+#include <boost/chrono/duration.hpp>
+#include <boost/mmm/detail/async_io_thread.hpp>
 
 #if !defined(BOOST_MMM_CONTAINER_HAS_NO_ALLOCATOR_TRAITS)
 #include BOOST_MMM_CONTAINER_ALLOCATOR_TRAITS_HEADER
@@ -74,7 +80,19 @@ namespace boost { namespace mmm {
 
 namespace detail {
 
-template <typename StrategyTraits, typename Allocator>
+struct disabling_asio_pool {}; // struct disabling_asio_pool
+BOOST_STATIC_CONSTEXPR disabling_asio_pool noasyncpool;
+
+} // namespace boost::mmm::detail
+
+using detail::noasyncpool;
+
+template <typename Strategy, typename Allocator = std::allocator<void> >
+struct scheduler;
+
+namespace detail {
+
+template <typename SchedulerTraits, typename StrategyTraits, typename Allocator>
 struct scheduler_data : private noncopyable
 {
 #if !defined(BOOST_MMM_CONTAINER_HAS_NO_ALLOCATOR_TRAITS)
@@ -85,11 +103,11 @@ struct scheduler_data : private noncopyable
     struct map_type
     {
         typedef std::pair<const Key, Elem> value_type;
-        typedef
+        typedef typename
 #if !defined(BOOST_MMM_CONTAINER_HAS_NO_ALLOCATOR_TRAITS)
-          typename allocator_traits::template rebind_alloc<value_type>
+          allocator_traits::template rebind_alloc<value_type>
 #else
-          typename Allocator::template rebind<value_type>::other
+          Allocator::template rebind<value_type>::other
 #endif
         alloc_type;
 
@@ -105,20 +123,35 @@ struct scheduler_data : private noncopyable
     typedef typename map_type<thread::id, thread>::type kernels_type;
     typedef typename StrategyTraits::pool_type users_type;
 
+    typedef
+      detail::async_io_thread<SchedulerTraits, StrategyTraits, Allocator>
+    async_io_thread;
+    // XXX: Should use specified allocator.
+    typedef
+      interprocess::unique_ptr<async_io_thread, checked_deleter<async_io_thread> >
+    async_pool_type;
+
     atomic<int>        status;
     unsigned           runnings;
     mutex              mtx;
     condition_variable cond;
     kernels_type       kernels;
     users_type         users;
+    async_pool_type    async_pool;
 
-    scheduler_data()
+    template <typename Rep, typename Period>
+    scheduler_data(SchedulerTraits scheduler_traits, chrono::duration<Rep, Period> poll_TO)
+      : status(0), runnings(0)
+      , async_pool(new async_io_thread(scheduler_traits, StrategyTraits(), poll_TO)) {}
+
+    explicit
+    scheduler_data(disabling_asio_pool)
       : status(0), runnings(0) {}
-};
+}; // template struct scheduler_data
 
 } // namespace boost::mmm::detail
 
-template <typename Strategy, typename Allocator = std::allocator<void> >
+template <typename Strategy, typename Allocator>
 class scheduler
 {
     BOOST_MOVABLE_BUT_NOT_COPYABLE(scheduler)
@@ -149,10 +182,10 @@ private:
 #endif
     typedef mmm::scheduler_traits<this_type> scheduler_traits;
     typedef
-      mmm::strategy_traits<strategy_type, detail::context, allocator_type>
+      mmm::strategy_traits<strategy_type, detail::context_tuple, allocator_type>
     strategy_traits;
 
-    typedef detail::scheduler_data<strategy_traits, allocator_type> scheduler_data;
+    typedef detail::scheduler_data<scheduler_traits, strategy_traits, allocator_type> scheduler_data;
     typedef typename scheduler_data::kernels_type kernels_type;
     typedef typename scheduler_data::users_type users_type;
 
@@ -162,14 +195,36 @@ public:
 private:
 #if !defined(BOOST_MMM_DOXYGEN_INVOKED)
     void
-    _m_resume_context(unique_lock<mutex> &guard, context_type &ctx)
+    _m_resume_context(unique_lock<mutex> &guard, scheduler_data &data, context_type &ctx)
     {
         using namespace detail;
         unique_unlock<mutex> unguard(guard);
 
+        io_callback_base *&callback = fusion::at_c<1>(ctx);
+        if (callback)
+        {
+            BOOST_ASSERT(!callback->done());
+            if (!data.async_pool || !callback->is_aggregatable())
+            {
+                system::error_code err_code;
+                if (callback->check_events(err_code))
+                {
+                    // No events were occured.
+                    return;
+                }
+            }
+            callback->operator()();
+            if (callback->done()) { callback = initialized_value; }
+        }
+
         current_context::set_current_ctx(&ctx);
-        ctx.resume();
+        fusion::at_c<0>(ctx).resume();
         current_context::set_current_ctx(0);
+
+        if (data.async_pool && callback && callback->is_aggregatable())
+        {
+            data.async_pool->push_ctx(move(ctx));
+        }
     }
 
     void
@@ -190,7 +245,7 @@ private:
             context_guard ctx_guard(scheduler_traits(*this), strategy_traits());
 
             ++data.runnings;
-            _m_resume_context(guard, ctx_guard.context());
+            _m_resume_context(guard, data, ctx_guard.context());
             --data.runnings;
 
             // Notify all even if context is finished to wakeup caller of join_all.
@@ -220,42 +275,14 @@ private:
         using namespace detail;
 
         current_context::set_current_ctx(&ctx);
-        BOOST_MMM_THREAD_FUTURE<T> f(reinterpret_cast<promise<T> *>(ctx.resume())->get_future());
+        BOOST_MMM_THREAD_FUTURE<T> f(reinterpret_cast<promise<T> *>(fusion::at_c<0>(ctx).resume())->get_future());
         current_context::set_current_ctx(0);
         return move(f);
     }
-#endif
 
-public:
-    /**
-     * <b>Effects</b>: Move internal scheduler datas from the other. And the
-     * other becomes <i>not-in-scheduling</i>.
-     *
-     * <b>Throws</b>: Nothing.
-     */
-    scheduler(BOOST_RV_REF(scheduler) other) BOOST_NOEXCEPT
-      : _m_data(move(other._m_data)) {}
-
-    /**
-     * <b>Effects</b>: Construct with specified count <i>kernel-threads</i>.
-     *
-     * <b>Throws</b>: std::invalid_argument (wrapped by Boost.Exception):
-     * if default_count <= 0 .
-     *
-     * <b>Postcondition</b>: *this is not <i>not-in-scheduling</i>.
-     */
-    explicit
-    scheduler(const int default_count)
+    void
+    _m_construct_thread_pool(const int default_count)
     {
-        if (!(0 < default_count))
-        {
-            using std::invalid_argument;
-            BOOST_THROW_EXCEPTION(invalid_argument("default_count should be > 0"));
-        }
-
-        // XXX: Should use specified allocator.
-        // Defer initializing.
-        _m_data.reset(new scheduler_data);
         BOOST_ASSERT(_m_data);
 
         for (int cnt = 0; cnt < default_count; ++cnt)
@@ -274,6 +301,63 @@ public:
 #if defined(BOOST_MMM_CONTAINER_BREAKING_EMPLACE_RETURN_TYPE)
         BOOST_ASSERT(_m_data->kernels.size() == default_count);
 #endif
+    }
+#endif
+
+public:
+    /**
+     * <b>Effects</b>: Move internal scheduler datas from the other. And the
+     * other becomes <i>not-in-scheduling</i>.
+     *
+     * <b>Throws</b>: Nothing.
+     */
+    scheduler(BOOST_RV_REF(scheduler) other) BOOST_NOEXCEPT
+      : _m_data(move(other._m_data)) {}
+
+    /**
+     * <b>Effects</b>: Construct with specified count <i>kernel-threads</i>
+     * and poller timeout.
+     *
+     * <b>Throws</b>: std::invalid_argument (wrapped by Boost.Exception):
+     * if default_count <= 0 .
+     *
+     * <b>Postcondition</b>: *this is not <i>not-in-scheduling</i>.
+     */
+    template <typename Rep, typename Period>
+    explicit
+    scheduler(const int default_count, chrono::duration<Rep, Period> poll_TO)
+    {
+        if (!(0 < default_count))
+        {
+            using std::invalid_argument;
+            BOOST_THROW_EXCEPTION(invalid_argument("default_count should be > 0"));
+        }
+
+        // XXX: Should use specified allocator.
+        // Defer initializing.
+        _m_data.reset(new scheduler_data(scheduler_traits(*this), poll_TO));
+        _m_construct_thread_pool(default_count);
+    }
+
+    /**
+     * <b>Effects</b>: Construct with specified count <i>kernel-threads</i>.
+     *
+     * <b>Throws</b>: std::invalid_argument (wrapped by Boost.Exception):
+     * if default_count <= 0 .
+     *
+     * <b>Postcondition</b>: *this is not <i>not-in-scheduling</i>.
+     */
+    explicit
+    scheduler(const int default_count, detail::disabling_asio_pool)
+    {
+        if (!(0 < default_count))
+        {
+            using std::invalid_argument;
+            BOOST_THROW_EXCEPTION(invalid_argument("default_count should be > 0"));
+        }
+
+        _m_data.reset(new scheduler_data(noasyncpool));
+        _m_construct_thread_pool(default_count);
     }
 
     /**
@@ -333,11 +417,11 @@ public:
         fn_result_type;                                                     \
                                                                             \
         context_type ctx;                                                   \
-        context_type(                                                       \
+        detail::context(                                                    \
           phoenix::bind(                                                    \
             context_starter<fn_result_type>(ctx)                            \
           , fn BOOST_PP_ENUM_TRAILING_PARAMS(n_, arg))                      \
-        , size).swap(ctx);                                                  \
+        , size).swap(fusion::at_c<0>(ctx));                                 \
         BOOST_MMM_THREAD_FUTURE<fn_result_type> f = start_context<fn_result_type>(ctx); \
                                                                             \
         unique_lock<mutex> guard(_m_data->mtx);                             \
@@ -401,9 +485,9 @@ public:
         fn_result_type;
 
         context_type ctx;
-        context_type(
+        detail::context(
           phoenix::bind(context_starter<fn_result_type>(ctx), fn, args...)
-        , size).swap(ctx);
+        , size).swap(fusion::at_c<0>(ctx));
         BOOST_MMM_THREAD_FUTURE<fn_result_type> f = start_context<fn_result_type>(ctx);
 
         unique_lock<mutex> guard(_m_data->mtx);
@@ -419,7 +503,9 @@ private:
     bool
     joinable_nolock() const BOOST_NOEXCEPT
     {
-        return _m_data->users.size() != 0 || _m_data->runnings != 0;
+        return _m_data->users.size() != 0
+          || _m_data->runnings != 0
+          || (_m_data->async_pool && _m_data->async_pool->joinable());
     }
 #endif
 public:
@@ -522,7 +608,7 @@ struct scheduler<Strategy, Allocator>::context_starter
     operator()(Fn &fn BOOST_PP_ENUM_TRAILING_BINARY_PARAMS(n_, Arg, &arg)) const \
     {                                                                   \
         promise<R> p;                                                   \
-        _m_ctx.get().suspend(reinterpret_cast<intptr_t>(&p));    \
+        fusion::at_c<0>(unwrap_ref(_m_ctx)).suspend(reinterpret_cast<intptr_t>(&p)); \
         p.set_value(fn(BOOST_PP_ENUM_PARAMS(n_, arg)));                 \
     }                                                                   \
 // BOOST_MMM_context_starter_op_call
@@ -534,7 +620,7 @@ struct scheduler<Strategy, Allocator>::context_starter
     operator()(Fn &fn, Args &... args) const
     {
         promise<R> p;
-        _m_ctx.get().suspend(reinterpret_cast<intptr_t>(&p));
+        fusion::at_c<0>(unwrap_ref(_m_ctx)).suspend(reinterpret_cast<intptr_t>(&p));
         p.set_value(fn(args...));
     }
 #endif
@@ -560,7 +646,7 @@ struct scheduler<Strategy, Allocator>::context_starter<void, Dummy>
     operator()(Fn &fn BOOST_PP_ENUM_TRAILING_BINARY_PARAMS(n_, Arg, &arg)) const \
     {                                                                   \
         promise<void> p;                                                \
-        _m_ctx.get().suspend(reinterpret_cast<intptr_t>(&p));           \
+        fusion::at_c<0>(unwrap_ref(_m_ctx)).suspend(reinterpret_cast<intptr_t>(&p)); \
         fn(BOOST_PP_ENUM_PARAMS(n_, arg));                              \
         p.set_value();                                                  \
     }                                                                   \
@@ -573,7 +659,7 @@ struct scheduler<Strategy, Allocator>::context_starter<void, Dummy>
     operator()(Fn &fn, Args &... args) const
     {
         promise<void> p;
-        _m_ctx.get().suspend(reinterpret_cast<intptr_t>(&p));
+        fusion::at_c<0>(unwrap_ref(_m_ctx)).suspend(reinterpret_cast<intptr_t>(&p));
         fn(args...);
         p.set_value();
     }

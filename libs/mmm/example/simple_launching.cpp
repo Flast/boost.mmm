@@ -17,8 +17,8 @@ void f(string which)
 
 int main()
 {
-    // Construct scheduler with one kernel thread.
-    mmm::scheduler<mmm::strategy::fifo> fifo(1);
+    // Construct scheduler with one kernel thread, no async IO pool.
+    mmm::scheduler<mmm::strategy::fifo> fifo(1, mmm::noasyncpool);
 
     // Add user threads.
     fifo.add_thread(f, "first");

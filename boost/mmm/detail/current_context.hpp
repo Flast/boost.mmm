@@ -11,9 +11,9 @@
 namespace boost { namespace mmm { namespace detail { namespace current_context {
 
 void
-set_current_ctx(context *);
+set_current_ctx(context_tuple *);
 
-context *
+context_tuple *
 get_current_ctx();
 
 } } } } // namespace boost::mmm::detail::current_context

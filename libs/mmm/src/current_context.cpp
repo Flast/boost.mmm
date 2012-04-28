@@ -34,7 +34,7 @@ typedef
 #else
   container::flat_map
 #endif
-    <thread::id, context *>
+    <thread::id, context_tuple *>
 context_map_type;
 
 namespace {
@@ -43,7 +43,7 @@ context_map_type _ctxmap;
 } // anonymous namespace
 
 void
-set_current_ctx(context *ctx)
+set_current_ctx(context_tuple *ctx)
 {
     const thread::id tid = this_thread::get_id();
 
@@ -68,7 +68,7 @@ set_current_ctx(context *ctx)
     BOOST_MMM_DETAIL_UNUSED(r);
 }
 
-context *
+context_tuple *
 get_current_ctx()
 {
     const thread::id tid = this_thread::get_id();

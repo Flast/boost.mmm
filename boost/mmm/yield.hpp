@@ -9,19 +9,21 @@
 #include <boost/mmm/detail/context.hpp>
 #include <boost/mmm/detail/current_context.hpp>
 
+#include <boost/fusion/include/at.hpp>
+
 namespace boost { namespace mmm { namespace this_ctx {
 
 /**
- * <b>Effects</b>: Yield context execution to others. No effects if this context
- * is not controlled under scheduler.
+ * <b>Effects</b>: Yield context execution to others. No effects if current
+ * context is not controlled under scheduler.
  */
 inline void
 yield()
 {
     using namespace detail::current_context;
-    if (detail::context *ctx = get_current_ctx())
+    if (detail::context_tuple *ctx_tuple = get_current_ctx())
     {
-        ctx->suspend();
+        fusion::at_c<0>(*ctx_tuple).suspend();
     }
 }
 

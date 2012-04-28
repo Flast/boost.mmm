@@ -16,16 +16,16 @@
 #include <boost/utility/swap.hpp>
 #include <boost/utility/value_init.hpp>
 
-#include <exception>
-#include <stdexcept>
-#include <boost/throw_exception.hpp>
-
 #include <boost/noncopyable.hpp>
-#include <boost/move/move.hpp>
+#include <boost/mmm/detail/move.hpp>
 
 #include <boost/context/fcontext.hpp>
 #include <boost/context/stack_allocator.hpp>
 #include <boost/context/stack_utils.hpp>
+
+#include <exception>
+#include <stdexcept>
+#include <boost/throw_exception.hpp>
 
 #include <boost/function.hpp>
 #include <boost/phoenix/bind/bind_member_function.hpp>
@@ -33,13 +33,17 @@
 #include <boost/checked_delete.hpp>
 #include <boost/interprocess/smart_ptr/unique_ptr.hpp>
 
+#include <boost/mmm/io/detail/poll.hpp>
+
+#include <boost/fusion/include/adapt_struct.hpp>
+
 namespace boost { namespace mmm { namespace detail {
 
 struct context_exception : public std::logic_error
 {
     context_exception(const std::string &v)
       : std::logic_error(v) {}
-};
+}; // struct context_exception
 
 struct context
 {
@@ -60,7 +64,7 @@ private:
           , context_status_run
           , context_status_suspend
           , context_status_done
-        };
+        }; // enum status_t
 
         static void
         _m_executer(intptr_t this_)
@@ -231,9 +235,103 @@ public:
 
 private:
     unique_ptr_<context_data_>::type _m_data;
-};
+}; // struct context
+
+inline void
+swap(context &left, context &right) BOOST_NOEXCEPT
+{
+    left.swap(right);
+}
+
+class io_callback_base
+{
+protected:
+    typedef io::detail::polling_events event_type;
+
+    explicit
+    io_callback_base(event_type::type event)
+      : _m_event(event) {}
+
+    event_type::type
+    get_events() const { return _m_event; }
+
+public:
+    virtual
+    ~io_callback_base() {}
+
+    virtual void
+    operator()() = 0;
+
+    virtual bool
+    check_events(system::error_code &) const = 0;
+
+    virtual bool
+    done() const = 0;
+
+    virtual bool
+    is_aggregatable() const { return false; }
+
+    virtual pollfd
+    get_pollfd() const
+    {
+        BOOST_THROW_EXCEPTION(std::runtime_error("non-supported operation"));
+    }
+
+private:
+    event_type::type _m_event;
+}; // class io_callback_base
+
+struct context_tuple
+{
+    BOOST_MOVABLE_BUT_NOT_COPYABLE(context_tuple)
+
+public:
+    typedef context context_type;
+
+    context_tuple() : _m_ctx(), _m_io_callback() {}
+
+    explicit
+    context_tuple(BOOST_RV_REF(context_type) ctx, io_callback_base *callback)
+      : _m_ctx(move(ctx)), _m_io_callback(callback) {}
+
+    context_tuple(BOOST_RV_REF(context_tuple) other)
+      : _m_ctx(move(other._m_ctx))
+      , _m_io_callback(other._m_io_callback)
+    {
+        other._m_io_callback = initialized_value;
+    }
+
+    context_tuple &
+    operator=(BOOST_RV_REF(context_tuple) other)
+    {
+        context_tuple(move(other)).swap(*this);
+        return *this;
+    }
+
+    void
+    swap(context_tuple &other) BOOST_NOEXCEPT
+    {
+        boost::swap(_m_ctx        , other._m_ctx);
+        boost::swap(_m_io_callback, other._m_io_callback);
+    }
+
+    context_type     _m_ctx;
+    io_callback_base *_m_io_callback;
+}; // struct context_tuple
+
+inline void
+swap(context_tuple &l, context_tuple &r) BOOST_NOEXCEPT
+{
+    l.swap(r);
+}
 
 } } } // namespace boost::mmm::detail
+
+BOOST_FUSION_ADAPT_STRUCT(
+  boost::mmm::detail::context_tuple
+, (boost::mmm::detail::context_tuple::context_type, _m_ctx)
+  (boost::mmm::detail::io_callback_base *         , _m_io_callback)
+  )
 
 #endif // BOOST_MMM_DETAIL_CONTEXT_HPP
 

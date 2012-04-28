@@ -1,3 +1,5 @@
+#include <boost/chrono/duration.hpp>
+namespace chrono = boost::chrono;
 #include <boost/mmm/scheduler.hpp>
 #include <boost/mmm/strategy/fifo.hpp>
 namespace mmm = boost::mmm;
@@ -8,7 +10,7 @@ typedef mmm::scheduler<mmm::strategy::fifo> scheduler;
 
 scheduler foo()
 {
-    scheduler s(1);
+    scheduler s(1, chrono::milliseconds(10));
     BOOST_REQUIRE(s.kernel_size() == 1);
     return move(s);
 }
