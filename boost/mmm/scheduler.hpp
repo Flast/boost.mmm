@@ -393,7 +393,8 @@ public:
      */
     ~scheduler()
     {
-        BOOST_ASSERT(_m_data);
+        if (!_m_data) { return; }
+
         if (joinable()) { std::terminate(); }
 
         {
