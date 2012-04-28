@@ -14,8 +14,8 @@
 namespace boost { namespace mmm { namespace this_ctx {
 
 /**
- * <b>Effects</b>: Yield context execution to others. No effects if this context
- * is not controlled under scheduler.
+ * <b>Effects</b>: Yield context execution to others. No effects if current
+ * context is not controlled under scheduler.
  */
 inline void
 yield()

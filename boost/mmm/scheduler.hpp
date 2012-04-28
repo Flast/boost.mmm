@@ -304,7 +304,6 @@ private:
         fusion::at_c<0>(ctx).resume();
         current_context::set_current_ctx(0);
     }
-#endif
 
     void
     _m_construct_thread_pool(const int default_count)
@@ -328,6 +327,7 @@ private:
         BOOST_ASSERT(_m_data->kernels.size() == default_count);
 #endif
     }
+#endif
 
 public:
     /**

@@ -42,6 +42,11 @@ public:
 } // namespace boost::mmm::io::posix::detail
 
 /**
+ * <b>Effects</b>: Yield context execution to others and polling if the system
+ * call will block. The behavior is same as origial one if current context is
+ * not controlled under scheduler.
+ *
+ * <b>Returns</b>: Same as origial one.
  */
 inline ssize_t
 read(int fd, void *buf, std::size_t count)
@@ -88,6 +93,11 @@ public:
 } // namespace boost::mmm::io::posix::detail
 
 /**
+ * <b>Effects</b>: Yield context execution to others and polling if the system
+ * call will block. The behavior is same as origial one if current context is
+ * not controlled under scheduler.
+ *
+ * <b>Returns</b>: Same as origial one.
  */
 inline ssize_t
 write(int fd, const void *buf, std::size_t count)

@@ -22,6 +22,9 @@ struct scheduler_traits
 {
     typedef Scheduler scheduler_type;
 
+    /**
+     * <b>Effects</b>: No effects.
+     */
     explicit
     scheduler_traits(scheduler_type &sch)
       : _m_scheduler(sch) {}
