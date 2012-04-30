@@ -23,7 +23,7 @@ yield()
     using namespace detail::current_context;
     if (detail::context_tuple *ctx_tuple = get_current_ctx())
     {
-        fusion::at_c<0>(*ctx_tuple).suspend();
+        fusion::at_c<0>(*ctx_tuple).jump();
     }
 }
 

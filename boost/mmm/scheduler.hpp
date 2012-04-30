@@ -195,7 +195,7 @@ public:
 private:
 #if !defined(BOOST_MMM_DOXYGEN_INVOKED)
     void
-    _m_resume_context(unique_lock<mutex> &guard, scheduler_data &data, context_type &ctx)
+    _m_jump_context(unique_lock<mutex> &guard, scheduler_data &data, context_type &ctx)
     {
         using namespace detail;
         unique_unlock<mutex> unguard(guard);
@@ -218,7 +218,7 @@ private:
         }
 
         current_context::set_current_ctx(&ctx);
-        fusion::at_c<0>(ctx).resume();
+        fusion::at_c<0>(ctx).jump();
         current_context::set_current_ctx(0);
 
         if (data.async_pool && callback && callback->is_aggregatable())
@@ -245,7 +245,7 @@ private:
             context_guard ctx_guard(scheduler_traits(*this), strategy_traits());
 
             ++data.runnings;
-            _m_resume_context(guard, data, ctx_guard.context());
+            _m_jump_context(guard, data, ctx_guard.context());
             --data.runnings;
 
             // Notify all even if context is finished to wakeup caller of join_all.
@@ -275,7 +275,7 @@ private:
         using namespace detail;
 
         current_context::set_current_ctx(&ctx);
-        BOOST_MMM_THREAD_FUTURE<T> f(reinterpret_cast<promise<T> *>(fusion::at_c<0>(ctx).resume())->get_future());
+        BOOST_MMM_THREAD_FUTURE<T> f(reinterpret_cast<promise<T> *>(fusion::at_c<0>(ctx).jump())->get_future());
         current_context::set_current_ctx(0);
         return move(f);
     }
@@ -608,7 +608,7 @@ struct scheduler<Strategy, Allocator>::context_starter
     operator()(Fn &fn BOOST_PP_ENUM_TRAILING_BINARY_PARAMS(n_, Arg, &arg)) const \
     {                                                                   \
         promise<R> p;                                                   \
-        fusion::at_c<0>(unwrap_ref(_m_ctx)).suspend(reinterpret_cast<intptr_t>(&p)); \
+        fusion::at_c<0>(unwrap_ref(_m_ctx)).jump(&p);                   \
         p.set_value(fn(BOOST_PP_ENUM_PARAMS(n_, arg)));                 \
     }                                                                   \
 // BOOST_MMM_context_starter_op_call
@@ -620,7 +620,7 @@ struct scheduler<Strategy, Allocator>::context_starter
     operator()(Fn &fn, Args &... args) const
     {
         promise<R> p;
-        fusion::at_c<0>(unwrap_ref(_m_ctx)).suspend(reinterpret_cast<intptr_t>(&p));
+        fusion::at_c<0>(unwrap_ref(_m_ctx)).jump(&p);
         p.set_value(fn(args...));
     }
 #endif
@@ -646,7 +646,7 @@ struct scheduler<Strategy, Allocator>::context_starter<void, Dummy>
     operator()(Fn &fn BOOST_PP_ENUM_TRAILING_BINARY_PARAMS(n_, Arg, &arg)) const \
     {                                                                   \
         promise<void> p;                                                \
-        fusion::at_c<0>(unwrap_ref(_m_ctx)).suspend(reinterpret_cast<intptr_t>(&p)); \
+        fusion::at_c<0>(unwrap_ref(_m_ctx)).jump(&p);                   \
         fn(BOOST_PP_ENUM_PARAMS(n_, arg));                              \
         p.set_value();                                                  \
     }                                                                   \
@@ -659,7 +659,7 @@ struct scheduler<Strategy, Allocator>::context_starter<void, Dummy>
     operator()(Fn &fn, Args &... args) const
     {
         promise<void> p;
-        fusion::at_c<0>(unwrap_ref(_m_ctx)).suspend(reinterpret_cast<intptr_t>(&p));
+        fusion::at_c<0>(unwrap_ref(_m_ctx)).jump(&p);
         fn(args...);
         p.set_value();
     }

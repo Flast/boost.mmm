@@ -78,7 +78,7 @@ yield_blocker_syscall(posix_callback<T> &callback)
     if (context_tuple *ctx_tuple = get_current_ctx())
     {
         fusion::at_c<1>(*ctx_tuple) = &callback;
-        fusion::at_c<0>(*ctx_tuple).suspend();
+        fusion::at_c<0>(*ctx_tuple).jump();
     }
     else
     {
