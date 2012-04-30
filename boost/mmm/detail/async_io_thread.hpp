@@ -13,7 +13,7 @@
 #include <boost/noncopyable.hpp>
 
 #if !defined(BOOST_MMM_CONTAINER_HAS_NO_ALLOCATOR_TRAITS)
-#include <boost/container/allocator/allocator_traits.hpp>
+#include BOOST_MMM_CONTAINER_ALLOCATOR_TRAITS_HEADER
 #endif
 #include <boost/container/vector.hpp>
 #include <boost/container/list.hpp>
