@@ -18,50 +18,50 @@ namespace boost { namespace mmm {
 namespace detail
 {
 #if defined(BOOST_MMM_THREAD_SUPPORTS_MOVE_BASED_MOVE)
-using boost::BOOST_THREAD_FUTURE;
+using boost::BOOST_MMM_THREAD_FUTURE;
 #else
 template <typename>
-class BOOST_THREAD_FUTURE;
+class BOOST_MMM_THREAD_FUTURE;
 #endif
 } // namespace boost::mmm::detail
-using detail::BOOST_THREAD_FUTURE;
+using detail::BOOST_MMM_THREAD_FUTURE;
 
 #if ! defined(BOOST_MMM_THREAD_SUPPORTS_MOVE_BASED_MOVE)
 
 namespace detail {
 
 template <typename R>
-class BOOST_THREAD_FUTURE : public boost::BOOST_THREAD_FUTURE<R>
+class BOOST_MMM_THREAD_FUTURE : public boost::BOOST_MMM_THREAD_FUTURE<R>
 {
-    BOOST_MOVABLE_BUT_NOT_COPYABLE(BOOST_THREAD_FUTURE<R>)
+    BOOST_MOVABLE_BUT_NOT_COPYABLE(BOOST_MMM_THREAD_FUTURE<R>)
 
-    typedef boost::BOOST_THREAD_FUTURE<R> _base_t;
+    typedef boost::BOOST_MMM_THREAD_FUTURE<R> _base_t;
 
 public:
-    BOOST_THREAD_FUTURE() {}
+    BOOST_MMM_THREAD_FUTURE() {}
 
-    BOOST_THREAD_FUTURE(BOOST_RV_REF(BOOST_THREAD_FUTURE) other) BOOST_NOEXCEPT
-      : _base_t(other.move()) {}
+    BOOST_MMM_THREAD_FUTURE(BOOST_RV_REF(BOOST_MMM_THREAD_FUTURE) other) BOOST_NOEXCEPT
+      : _base_t(move(static_cast<_base_t &>(other))) {}
 
     // NOTE: Declare as explicit to avoid ambiguous overload resolution.
     explicit
-    BOOST_THREAD_FUTURE(BOOST_THREAD_RV_REF(_base_t) other) BOOST_NOEXCEPT
+    BOOST_MMM_THREAD_FUTURE(BOOST_MMM_THREAD_RV_REF(_base_t) other) BOOST_NOEXCEPT
       : _base_t(other) {}
 
-    BOOST_THREAD_FUTURE &
-    operator=(BOOST_RV_REF(BOOST_THREAD_FUTURE) other) BOOST_NOEXCEPT
+    BOOST_MMM_THREAD_FUTURE &
+    operator=(BOOST_RV_REF(BOOST_MMM_THREAD_FUTURE) other) BOOST_NOEXCEPT
     {
-        _base_t::operator=(other.move());
+        _base_t::operator=(move(static_cast<_base_t &>(other)));
         return *this;
     }
 
-    BOOST_THREAD_FUTURE &
-    operator=(BOOST_THREAD_RV_REF(_base_t) other) BOOST_NOEXCEPT
+    BOOST_MMM_THREAD_FUTURE &
+    operator=(BOOST_MMM_THREAD_RV_REF(_base_t) other) BOOST_NOEXCEPT
     {
         _base_t::operator=(other);
         return *this;
     }
-}; // template class BOOST_THREAD_FUTURE
+}; // template class BOOST_MMM_THREAD_FUTURE
 
 } // namespace boost::mmm::detail
 

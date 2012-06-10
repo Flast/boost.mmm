@@ -42,7 +42,7 @@ class BOOST_THREAD_DECL thread : public boost::thread
 
     // Ignoring original impls
 #if defined(BOOST_NO_RVALUE_REFERENCES)
-    using _base_t::operator BOOST_THREAD_RV_REF(boost::thread);
+    using _base_t::operator BOOST_MMM_THREAD_RV_REF(boost::thread);
 #endif
     using _base_t::move;
 

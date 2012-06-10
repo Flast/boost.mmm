@@ -18,9 +18,6 @@
 #   define BOOST_NOEXCEPT
 #endif
 
-// see #6272 in svn.boost.org
-//#define BOOST_MMM_THREAD_SUPPORTS_HASHABLE_THREAD_ID
-
 #if BOOST_VERSION < 104900
 
 // see #6336 in svn.boost.org
@@ -31,23 +28,38 @@
 
 #endif
 
-// Boost.Container's allocator_traits.hpp will be moved in 1.50.0 release.
 #if BOOST_VERSION < 105000
-#   define BOOST_MMM_CONTAINER_ALLOCATOR_TRAITS_HEADER "boost/container/allocator/allocator_traits.hpp"
+
+#   define BOOST_MMM_CONTAINER_ALLOCATOR_TRAITS_HEADER \
+      "boost/container/allocator/allocator_traits.hpp"
+
+#   define BOOST_MMM_THREAD_FUTURE unique_future
+#   define BOOST_MMM_THREAD_RV_REF(TYPE_) ::boost::detail::thread_move_t<TYPE_>
+
 #else
-#   define BOOST_MMM_CONTAINER_ALLOCATOR_TRAITS_HEADER "boost/container/allocator_traits.hpp"
+
+// Boost.Container's allocator_traits.hpp will be moved in 1.50.0 release.
+#   define BOOST_MMM_CONTAINER_ALLOCATOR_TRAITS_HEADER \
+      "boost/container/allocator_traits.hpp"
+
+#   define BOOST_MMM_THREAD_FUTURE BOOST_THREAD_FUTURE
+#   define BOOST_MMM_THREAD_RV_REF(TYPE_) BOOST_THREAD_RV_REF(TYPE_)
+
+// see #6272 in svn.boost.org
+#   define BOOST_MMM_THREAD_SUPPORTS_HASHABLE_THREAD_ID
+
 #endif
+
+#if 1 < BOOST_THREAD_VERSION
+
+#   define BOOST_THREAD_SUPPORTS_SLEEP_FOR
 
 // Currently(after Boost 1.48.0), Boost has Move Semantics emulator library: Boost.Move.
-// But Boost.Thread implements Move Semantics with original implementations.
-#if defined(BOOST_THREAD_USES_MOVE)
-#   define BOOST_MMM_THREAD_SUPPORTS_MOVE_BASED_MOVE
-#endif
+// But Boost.Thread v1 implements Move Semantics with original implementations.
+#   if defined(BOOST_THREAD_USES_MOVE)
+#       define BOOST_MMM_THREAD_SUPPORTS_MOVE_BASED_MOVE
+#   endif
 
-#define BOOST_MMM_THREAD_FUTURE ::boost::mmm::BOOST_THREAD_FUTURE
-
-#if defined(BOOST_THREAD_VERSION) && 1 < BOOST_THREAD_VERSION
-#   define BOOST_THREAD_SUPPORTS_SLEEP_FOR
 #endif
 
 #endif
