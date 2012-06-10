@@ -109,7 +109,8 @@ struct scheduler_data : private noncopyable
         alloc_type;
 
         typedef
-#if defined(BOOST_MMM_THREAD_SUPPORTS_HASHABLE_THREAD_ID)
+#if defined(BOOST_MMM_THREAD_SUPPORTS_HASHABLE_THREAD_ID) \
+ && defined(BOOST_UNORDERED_USE_MOVE)
           unordered_map<Key, Elem, hash<Key>, std::equal_to<Key>, alloc_type>
 #else
           container::map<Key, Elem, std::less<Key>, alloc_type>

@@ -29,7 +29,8 @@ using namespace std;
 namespace boost { namespace mmm { namespace detail { namespace current_context {
 
 typedef
-#if defined(BOOST_MMM_THREAD_SUPPORTS_HASHABLE_THREAD_ID)
+#if defined(BOOST_MMM_THREAD_SUPPORTS_HASHABLE_THREAD_ID) \
+ && defined(BOOST_UNORDERED_USE_MOVE)
   unordered_map
 #else
   container::flat_map
@@ -59,7 +60,8 @@ set_current_ctx(context_tuple *ctx)
 
     lock_guard<shared_mutex> guard(_ctxmtx);
     pair<context_map_type::iterator, bool> r =
-#if defined(BOOST_MMM_THREAD_SUPPORTS_HASHABLE_THREAD_ID)
+#if defined(BOOST_MMM_THREAD_SUPPORTS_HASHABLE_THREAD_ID) \
+ && defined(BOOST_UNORDERED_USE_MOVE)
       _ctxmap.emplace(tid, ctx);
 #else
       _ctxmap.insert(make_pair(tid, ctx));
