@@ -14,9 +14,14 @@
 #   error Boost.MMM requires Boost 1.48.0 or later
 #endif
 
-#if !defined(BOOST_NOEXCEPT)
-#   define BOOST_NOEXCEPT
+#if defined(BOOST_NOEXCEPT)
+#   define BOOST_MMM_NOEXCEPT BOOST_NOEXCEPT
+#else
+#   define BOOST_MMM_NOEXCEPT
 #endif
+
+#define BOOST_MMM_DETAIL_UNUSED(expr) \
+  (true ? (void)0 : (void)expr)
 
 #if BOOST_VERSION < 104900
 
@@ -52,7 +57,7 @@
 
 #if 1 < BOOST_THREAD_VERSION
 
-#   define BOOST_THREAD_SUPPORTS_SLEEP_FOR
+#   define BOOST_MMM_THREAD_SUPPORTS_SLEEP_FOR
 
 // Currently(after Boost 1.48.0), Boost has Move Semantics emulator library: Boost.Move.
 // But Boost.Thread v1 implements Move Semantics with original implementations.

@@ -15,9 +15,6 @@
 #include <boost/cstdint.hpp>
 
 #include <boost/assert.hpp>
-#if !defined(BOOST_MMM_CONTAINER_BREAKING_EMPLACE_RETURN_TYPE)
-#include <boost/mmm/detail/unused.hpp>
-#endif
 #include <boost/ref.hpp>
 #include <boost/noncopyable.hpp>
 #include <boost/mmm/detail/move.hpp>
@@ -311,7 +308,7 @@ public:
      *
      * <b>Throws</b>: Nothing.
      */
-    scheduler(BOOST_RV_REF(scheduler) other) BOOST_NOEXCEPT
+    scheduler(BOOST_RV_REF(scheduler) other) BOOST_MMM_NOEXCEPT
       : _m_data(move(other._m_data)) {}
 
     /**
@@ -501,7 +498,7 @@ public:
 private:
 #if !defined(BOOST_MMM_DOXYGEN_INVOKED)
     bool
-    joinable_nolock() const BOOST_NOEXCEPT
+    joinable_nolock() const BOOST_MMM_NOEXCEPT
     {
         return _m_data->users.size() != 0
           || _m_data->runnings != 0
@@ -519,7 +516,7 @@ public:
      * <b>Postcondition</b>: !joinable()
      */
     void
-    join_all() BOOST_NOEXCEPT
+    join_all() BOOST_MMM_NOEXCEPT
     {
         BOOST_ASSERT(_m_data);
         unique_lock<mutex> guard(_m_data->mtx);
@@ -541,7 +538,7 @@ public:
      * <b>Throws</b>: Nothing.
      */
     bool
-    joinable() const BOOST_NOEXCEPT
+    joinable() const BOOST_MMM_NOEXCEPT
     {
         BOOST_ASSERT(_m_data);
         unique_lock<mutex> guard(_m_data->mtx);
@@ -556,7 +553,7 @@ public:
      * <b>Throws</b>: Nothing.
      */
     size_type
-    kernel_size() const BOOST_NOEXCEPT
+    kernel_size() const BOOST_MMM_NOEXCEPT
     {
         BOOST_ASSERT(_m_data);
         unique_lock<mutex> guard(_m_data->mtx);
@@ -571,7 +568,7 @@ public:
      * <b>Throws</b>: Nothing.
      */
     size_type
-    user_size() const BOOST_NOEXCEPT
+    user_size() const BOOST_MMM_NOEXCEPT
     {
         BOOST_ASSERT(_m_data);
         unique_lock<mutex> guard(_m_data->mtx);

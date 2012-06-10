@@ -41,7 +41,7 @@
 #include <boost/mmm/detail/locks.hpp>
 
 #include <boost/chrono/duration.hpp>
-#ifndef BOOST_THREAD_SUPPORTS_SLEEP_FOR
+#ifndef BOOST_MMM_THREAD_SUPPORTS_SLEEP_FOR
 #include <boost/date_time/posix_time/posix_time_config.hpp>
 #endif
 #include <boost/system/error_code.hpp>
@@ -140,7 +140,7 @@ class async_io_thread : private noncopyable
             return poll_fds(make_array_ref(_m_pfds), poll_TO, err_code);
         }
 
-#ifdef BOOST_THREAD_SUPPORTS_SLEEP_FOR
+#ifdef BOOST_MMM_THREAD_SUPPORTS_SLEEP_FOR
         this_thread::sleep_for(poll_TO);
 #else
         typedef

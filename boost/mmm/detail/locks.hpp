@@ -46,13 +46,13 @@ public:
     }
 
     explicit
-    unique_unlock(BOOST_RV_REF(unique_unlock) other) BOOST_NOEXCEPT
+    unique_unlock(BOOST_RV_REF(unique_unlock) other) BOOST_MMM_NOEXCEPT
     {
         swap(other);
     }
 
     unique_unlock &
-    operator=(BOOST_RV_REF(unique_unlock) other) BOOST_NOEXCEPT
+    operator=(BOOST_RV_REF(unique_unlock) other) BOOST_MMM_NOEXCEPT
     {
         unique_unlock(move(other)).swap(*this);
         return *this;
@@ -85,7 +85,7 @@ private:
 
 template <typename Mutex>
 inline void
-swap(unique_unlock<Mutex> &a, unique_unlock<Mutex> &b) BOOST_NOEXCEPT
+swap(unique_unlock<Mutex> &a, unique_unlock<Mutex> &b) BOOST_MMM_NOEXCEPT
 {
     a.swap(b);
 }

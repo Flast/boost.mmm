@@ -48,19 +48,19 @@ public:
     }
 
     context_type &
-    context() BOOST_NOEXCEPT { return _m_ctx; }
+    context() BOOST_MMM_NOEXCEPT { return _m_ctx; }
 
     const context_type &
-    context() const BOOST_NOEXCEPT { return _m_ctx; }
+    context() const BOOST_MMM_NOEXCEPT { return _m_ctx; }
 
 #if defined(BOOST_NO_EXPLICIT_CONVERSION_OPERATORS)
-    operator unspecified_bool_type() const BOOST_NOEXCEPT
+    operator unspecified_bool_type() const BOOST_MMM_NOEXCEPT
     {
         return is_suspended() ? &context_guard::true_type : 0;
     }
 #else
     explicit
-    operator bool() const BOOST_NOEXCEPT
+    operator bool() const BOOST_MMM_NOEXCEPT
     {
         return is_suspended();
     }
@@ -68,7 +68,7 @@ public:
 
 private:
     bool
-    is_suspended() const BOOST_NOEXCEPT
+    is_suspended() const BOOST_MMM_NOEXCEPT
     {
         using fusion::at_c;
         return at_c<0>(context()) && !at_c<0>(context()).is_complete();

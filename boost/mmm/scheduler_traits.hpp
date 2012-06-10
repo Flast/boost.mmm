@@ -35,7 +35,7 @@ struct scheduler_traits
      * <b>Returns</b>: Context pool.
      */
     typename scheduler_type::strategy_traits::pool_type &
-    pool() const BOOST_NOEXCEPT
+    pool() const BOOST_MMM_NOEXCEPT
     {
         BOOST_ASSERT(_m_scheduler.get()._m_data);
         return _m_scheduler.get()._m_data->users;

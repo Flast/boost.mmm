@@ -40,23 +40,23 @@ class BOOST_MMM_THREAD_FUTURE : public boost::BOOST_MMM_THREAD_FUTURE<R>
 public:
     BOOST_MMM_THREAD_FUTURE() {}
 
-    BOOST_MMM_THREAD_FUTURE(BOOST_RV_REF(BOOST_MMM_THREAD_FUTURE) other) BOOST_NOEXCEPT
+    BOOST_MMM_THREAD_FUTURE(BOOST_RV_REF(BOOST_MMM_THREAD_FUTURE) other) BOOST_MMM_NOEXCEPT
       : _base_t(move(static_cast<_base_t &>(other))) {}
 
     // NOTE: Declare as explicit to avoid ambiguous overload resolution.
     explicit
-    BOOST_MMM_THREAD_FUTURE(BOOST_MMM_THREAD_RV_REF(_base_t) other) BOOST_NOEXCEPT
+    BOOST_MMM_THREAD_FUTURE(BOOST_MMM_THREAD_RV_REF(_base_t) other) BOOST_MMM_NOEXCEPT
       : _base_t(other) {}
 
     BOOST_MMM_THREAD_FUTURE &
-    operator=(BOOST_RV_REF(BOOST_MMM_THREAD_FUTURE) other) BOOST_NOEXCEPT
+    operator=(BOOST_RV_REF(BOOST_MMM_THREAD_FUTURE) other) BOOST_MMM_NOEXCEPT
     {
         _base_t::operator=(move(static_cast<_base_t &>(other)));
         return *this;
     }
 
     BOOST_MMM_THREAD_FUTURE &
-    operator=(BOOST_MMM_THREAD_RV_REF(_base_t) other) BOOST_NOEXCEPT
+    operator=(BOOST_MMM_THREAD_RV_REF(_base_t) other) BOOST_MMM_NOEXCEPT
     {
         _base_t::operator=(other);
         return *this;

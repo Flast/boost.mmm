@@ -147,7 +147,7 @@ private:
         }
 
         bool
-        is_complete() const BOOST_NOEXCEPT
+        is_complete() const BOOST_MMM_NOEXCEPT
         {
             return _m_status == context_status_done;
         }
@@ -174,11 +174,11 @@ public:
     context(F f, std::size_t size = ctx::default_stacksize())
       : _m_data(new context_data_(f, size)) {}
 
-    context(BOOST_RV_REF(context) other) BOOST_NOEXCEPT
+    context(BOOST_RV_REF(context) other) BOOST_MMM_NOEXCEPT
       : _m_data(move(other._m_data)) {}
 
     context &
-    operator=(BOOST_RV_REF(context) other) BOOST_NOEXCEPT
+    operator=(BOOST_RV_REF(context) other) BOOST_MMM_NOEXCEPT
     {
         context(move(other)).swap(*this);
         return *this;
@@ -200,26 +200,26 @@ public:
     }
 
 #if defined(BOOST_NO_EXPLICIT_CONVERSION_OPERATORS)
-    operator unspecified_bool_type() const BOOST_NOEXCEPT
+    operator unspecified_bool_type() const BOOST_MMM_NOEXCEPT
     {
         return _m_data ? &context::true_type_ : 0;
     }
 #else
     explicit
-    operator bool() const BOOST_NOEXCEPT
+    operator bool() const BOOST_MMM_NOEXCEPT
     {
         return _m_data;
     }
 #endif
 
     bool
-    operator!() const BOOST_NOEXCEPT
+    operator!() const BOOST_MMM_NOEXCEPT
     {
         return !static_cast<bool>(*this);
     }
 
     void
-    swap(context &other) BOOST_NOEXCEPT
+    swap(context &other) BOOST_MMM_NOEXCEPT
     {
         boost::swap(_m_data, other._m_data);
     }
@@ -236,7 +236,7 @@ private:
 }; // struct context
 
 inline void
-swap(context &left, context &right) BOOST_NOEXCEPT
+swap(context &left, context &right) BOOST_MMM_NOEXCEPT
 {
     left.swap(right);
 }
@@ -307,7 +307,7 @@ public:
     }
 
     void
-    swap(context_tuple &other) BOOST_NOEXCEPT
+    swap(context_tuple &other) BOOST_MMM_NOEXCEPT
     {
         boost::swap(_m_ctx        , other._m_ctx);
         boost::swap(_m_io_callback, other._m_io_callback);
@@ -318,7 +318,7 @@ public:
 }; // struct context_tuple
 
 inline void
-swap(context_tuple &l, context_tuple &r) BOOST_NOEXCEPT
+swap(context_tuple &l, context_tuple &r) BOOST_MMM_NOEXCEPT
 {
     l.swap(r);
 }
