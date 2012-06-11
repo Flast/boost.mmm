@@ -7,9 +7,7 @@
 using namespace std;
 
 #include <boost/mmm/detail/workaround.hpp>
-
 #include <boost/assert.hpp>
-#include <boost/mmm/detail/unused.hpp>
 
 #include <boost/thread/thread.hpp>
 #include <boost/thread/shared_mutex.hpp>
