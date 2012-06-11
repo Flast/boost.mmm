@@ -446,7 +446,7 @@ public:
 #if !defined(BOOST_MMM_DOXYGEN_INVOKED)
     typename disable_if<
       is_same<size_type, Fn>
-    , BOOST_MMM_THREAD_FUTURE<typename result_of<Fn(Args...)>::type> >::type
+    , BOOST_MMM_THREAD_FUTURE<typename result_of<typename remove_reference<Fn>::type(Args...)>::type> >::type
 #else
     future<typename result_of<Fn(Args...)>::type>
 #endif
@@ -469,7 +469,7 @@ public:
      */
     template <typename Fn, typename... Args>
 #if !defined(BOOST_MMM_DOXYGEN_INVOKED)
-    BOOST_MMM_THREAD_FUTURE<typename result_of<Fn(typename remove_reference<Args>::type...)>::type>
+    BOOST_MMM_THREAD_FUTURE<typename result_of<typename remove_reference<Fn>::type(typename remove_reference<Args>::type...)>::type>
 #else
     future<typename result_of<Fn(Args...)>::type>
 #endif
@@ -477,7 +477,7 @@ public:
     {
         BOOST_ASSERT(_m_data);
 
-        typedef typename detail::function_to_functor<Fn>::type fn_type;
+        typedef typename remove_reference<Fn>::type fn_type;
         typedef typename
           result_of<fn_type(typename remove_reference<Args>::type...)>::type
         fn_result_type;
