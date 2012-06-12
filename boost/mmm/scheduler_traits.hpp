@@ -13,7 +13,7 @@
 #include <boost/assert.hpp>
 
 #include <boost/thread/mutex.hpp>
-#include <boost/mmm/detail/locks.hpp>
+#include <boost/mmm/detail/thread/locks.hpp>
 
 namespace boost { namespace mmm {
 

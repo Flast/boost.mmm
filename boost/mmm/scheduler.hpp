@@ -33,8 +33,8 @@
 #include <boost/type_traits/is_same.hpp>
 
 #include <boost/mmm/detail/context.hpp>
-#include <boost/mmm/detail/thread.hpp>
-#include <boost/mmm/detail/future.hpp>
+#include <boost/mmm/detail/thread/thread.hpp>
+#include <boost/mmm/detail/thread/future.hpp>
 #include <boost/utility/result_of.hpp>
 #include <boost/fusion/include/at.hpp>
 #include <boost/phoenix/bind/bind_function_object.hpp>
@@ -44,7 +44,7 @@
 #include <boost/atomic.hpp>
 #include <boost/thread/condition_variable.hpp>
 #include <boost/thread/mutex.hpp>
-#include <boost/mmm/detail/locks.hpp>
+#include <boost/mmm/detail/thread/locks.hpp>
 
 #include <boost/checked_delete.hpp>
 #include <boost/interprocess/smart_ptr/unique_ptr.hpp>

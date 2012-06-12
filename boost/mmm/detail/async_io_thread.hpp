@@ -20,7 +20,7 @@
 #include <boost/range/begin.hpp>
 #include <boost/range/end.hpp>
 
-#include <boost/mmm/detail/thread.hpp>
+#include <boost/mmm/detail/thread/thread.hpp>
 #include <boost/mmm/detail/context.hpp>
 
 #include <boost/phoenix/core.hpp>
@@ -38,7 +38,7 @@
 
 #include <boost/atomic.hpp>
 #include <boost/thread/mutex.hpp>
-#include <boost/mmm/detail/locks.hpp>
+#include <boost/mmm/detail/thread/locks.hpp>
 
 #include <boost/chrono/duration.hpp>
 #ifndef BOOST_MMM_THREAD_SUPPORTS_SLEEP_FOR
