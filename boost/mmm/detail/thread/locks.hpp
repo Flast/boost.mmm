@@ -7,6 +7,7 @@
 #define BOOST_MMM_DETAIL_LOCKS_HPP
 
 #include <boost/config.hpp>
+#include <boost/mmm/detail/workaround.hpp>
 
 #include <boost/ref.hpp>
 #include <boost/mmm/detail/move.hpp>
