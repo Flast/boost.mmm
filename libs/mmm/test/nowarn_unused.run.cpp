@@ -1,4 +1,4 @@
-#include <boost/mmm/detail/unused.hpp>
+#include <boost/mmm/detail/workaround.hpp>
 
 #include <boost/test/minimal.hpp>
 

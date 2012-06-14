@@ -2,7 +2,7 @@
 
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/locks.hpp>
-#include <boost/mmm/detail/locks.hpp>
+#include <boost/mmm/detail/thread/locks.hpp>
 using namespace boost;
 using boost::mmm::detail::unique_unlock;
 
