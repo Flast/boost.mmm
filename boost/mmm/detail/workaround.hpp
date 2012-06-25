@@ -67,5 +67,20 @@
 
 #endif
 
+#if defined(BOOST_MMM_CONTAINER_HAS_NO_ALLOCATOR_TRAITS)
+
+#   define BOOST_MMM_ALLOCATOR_REBIND(from_) \
+      from_::BOOST_MMM_allocator_rebind_to_
+#   define BOOST_MMM_allocator_rebind_to_(to_) template rebind<to_>::other
+
+#else
+
+#   include BOOST_MMM_CONTAINER_ALLOCATOR_TRAITS_HEADER
+#   define BOOST_MMM_ALLOCATOR_REBIND(from_) \
+      ::boost::container::allocator_traits<from_>::BOOST_MMM_allocator_rebind_to_
+#   define BOOST_MMM_allocator_rebind_to_(to_) template rebind_alloc<to_>
+
+#endif
+
 #endif
 

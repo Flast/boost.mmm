@@ -12,9 +12,6 @@
 #include <boost/ref.hpp>
 #include <boost/noncopyable.hpp>
 
-#if !defined(BOOST_MMM_CONTAINER_HAS_NO_ALLOCATOR_TRAITS)
-#include BOOST_MMM_CONTAINER_ALLOCATOR_TRAITS_HEADER
-#endif
 #include <boost/container/vector.hpp>
 #include <boost/container/list.hpp>
 #include <boost/range/begin.hpp>
@@ -84,34 +81,19 @@ class async_io_thread : private noncopyable
 
     typedef typename StrategyTraits::context_type context_type;
     typedef Alloc allocator_type;
-#if !defined(BOOST_MMM_CONTAINER_HAS_NO_ALLOCATOR_TRAITS)
-    typedef container::allocator_traits<allocator_type> allocator_traits;
-#endif
 
-    typedef
-#if !defined(BOOST_MMM_CONTAINER_HAS_NO_ALLOCATOR_TRAITS)
-      typename allocator_traits::template rebind_alloc<context_type>
-#else
-      typename allocator_type::template rebind<context_type>::other
-#endif
+    typedef typename
+      BOOST_MMM_ALLOCATOR_REBIND(allocator_type)(context_type)
     ctxact_alloc_type;
     typedef container::list<context_type, ctxact_alloc_type> ctxact_vector;
 
-    typedef
-#if !defined(BOOST_MMM_CONTAINER_HAS_NO_ALLOCATOR_TRAITS)
-      typename allocator_traits::template rebind_alloc<typename ctxact_vector::iterator>
-#else
-      typename allocator_type::template rebind<typename ctxact_vector::iterator>::other
-#endif
+    typedef typename
+      BOOST_MMM_ALLOCATOR_REBIND(allocator_type)(typename ctxact_vector::iterator)
     ctxitr_alloc_type;
     typedef container::vector<typename ctxact_vector::iterator, ctxitr_alloc_type> ctxitr_vector;
 
-    typedef
-#if !defined(BOOST_MMM_CONTAINER_HAS_NO_ALLOCATOR_TRAITS)
-      typename allocator_traits::template rebind_alloc<pollfd>
-#else
-      typename allocator_type::template rebind<pollfd>::other
-#endif
+    typedef typename
+      BOOST_MMM_ALLOCATOR_REBIND(allocator_type)(pollfd)
     pfd_alloc_type;
     typedef container::vector<pollfd, pfd_alloc_type> pollfd_vector;
 

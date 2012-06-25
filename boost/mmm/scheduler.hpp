@@ -52,9 +52,6 @@
 #include <boost/chrono/duration.hpp>
 #include <boost/mmm/detail/async_io_thread.hpp>
 
-#if !defined(BOOST_MMM_CONTAINER_HAS_NO_ALLOCATOR_TRAITS)
-#include BOOST_MMM_CONTAINER_ALLOCATOR_TRAITS_HEADER
-#endif
 #include <functional>
 #if defined(BOOST_MMM_THREAD_SUPPORTS_HASHABLE_THREAD_ID) \
  && defined(BOOST_UNORDERED_USE_MOVE)
@@ -92,20 +89,12 @@ namespace detail {
 template <typename SchedulerTraits, typename StrategyTraits, typename Allocator>
 struct scheduler_data : private noncopyable
 {
-#if !defined(BOOST_MMM_CONTAINER_HAS_NO_ALLOCATOR_TRAITS)
-    typedef container::allocator_traits<Allocator> allocator_traits;
-#endif
-
     template <typename Key, typename Elem>
     struct map_type
     {
         typedef std::pair<const Key, Elem> value_type;
         typedef typename
-#if !defined(BOOST_MMM_CONTAINER_HAS_NO_ALLOCATOR_TRAITS)
-          allocator_traits::template rebind_alloc<value_type>
-#else
-          Allocator::template rebind<value_type>::other
-#endif
+          BOOST_MMM_ALLOCATOR_REBIND(Allocator)(value_type)
         alloc_type;
 
         typedef
@@ -175,9 +164,6 @@ private:
 
     typedef mmm::detail::context_guard<this_type> context_guard;
 
-#if !defined(BOOST_MMM_CONTAINER_HAS_NO_ALLOCATOR_TRAITS)
-    typedef container::allocator_traits<allocator_type> allocator_traits;
-#endif
     typedef mmm::scheduler_traits<this_type> scheduler_traits;
     typedef
       mmm::strategy_traits<strategy_type, detail::context_tuple, allocator_type>
