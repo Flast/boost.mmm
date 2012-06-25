@@ -106,7 +106,7 @@ class async_io_thread : private noncopyable
         };
 
         bool
-        operator()(tuple<ignore, const pollfd &, ignore> pfd) const
+        operator()(boost::tuple<ignore, const pollfd &, ignore> pfd) const
         {
             return boost::get<1>(pfd).revents == 0;
         }
@@ -167,18 +167,18 @@ class async_io_thread : private noncopyable
             if (!err_code && 0 < ret)
             {
                 typedef
-                  tuple<
+                  boost::tuple<
                     guard_iterator
                   , typename pollfd_vector::iterator
                   , typename ctxitr_vector::iterator>
                 iterator_tuple;
 
                 typedef zip_iterator<iterator_tuple> zipitr;
-                const zipitr zipend(make_tuple(guard_iterator(), _m_pfds.end(), _m_ctxitr.end()));
+                const zipitr zipend(boost::make_tuple(guard_iterator(), _m_pfds.end(), _m_ctxitr.end()));
 
                 zip_iterator<iterator_tuple> itr =
                   std::partition(
-                    zipitr(make_tuple(guard_iterator(), _m_pfds.begin(), _m_ctxitr.begin()))
+                    zipitr(boost::make_tuple(guard_iterator(), _m_pfds.begin(), _m_ctxitr.begin()))
                   , zipend
                   , check_event());
 
@@ -192,8 +192,8 @@ class async_io_thread : private noncopyable
 
         // Cleanup all remained contexts.
         restore_contexts(
-          make_zip_iterator(make_tuple(guard_iterator(), _m_pfds.begin(), _m_ctxitr.begin()))
-        , make_zip_iterator(make_tuple(guard_iterator(), _m_pfds.end(), _m_ctxitr.end())));
+          make_zip_iterator(boost::make_tuple(guard_iterator(), _m_pfds.begin(), _m_ctxitr.begin()))
+        , make_zip_iterator(boost::make_tuple(guard_iterator(), _m_pfds.end(), _m_ctxitr.end())));
     }
 
     template <typename ZipIterator>
@@ -245,7 +245,7 @@ class async_io_thread : private noncopyable
         if (_m_pending_ctxs.size() != 0)
         {
             lock_guard<mutex> guard(_m_mtx);
-            move(begin(_m_pending_ctxs), end(_m_pending_ctxs), back_move_inserter(_m_ctxact));
+            move(boost::begin(_m_pending_ctxs), boost::end(_m_pending_ctxs), back_move_inserter(_m_ctxact));
             _m_pending_ctxs.clear();
         }
         for (iterator end = _m_ctxact.end(); ++itr != end; )
