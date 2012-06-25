@@ -11,7 +11,7 @@
 
 #include <boost/thread/future.hpp>
 
-#include <boost/mmm/detail/move.hpp>
+#include <boost/move/move.hpp>
 
 namespace boost { namespace mmm {
 
@@ -41,7 +41,7 @@ public:
     BOOST_MMM_THREAD_FUTURE() {}
 
     BOOST_MMM_THREAD_FUTURE(BOOST_RV_REF(BOOST_MMM_THREAD_FUTURE) other) BOOST_MMM_NOEXCEPT
-      : _base_t(move(static_cast<_base_t &>(other))) {}
+      : _base_t(boost::move(static_cast<_base_t &>(other))) {}
 
     // NOTE: Declare as explicit to avoid ambiguous overload resolution.
     explicit
@@ -51,7 +51,7 @@ public:
     BOOST_MMM_THREAD_FUTURE &
     operator=(BOOST_RV_REF(BOOST_MMM_THREAD_FUTURE) other) BOOST_MMM_NOEXCEPT
     {
-        _base_t::operator=(move(static_cast<_base_t &>(other)));
+        _base_t::operator=(boost::move(static_cast<_base_t &>(other)));
         return *this;
     }
 

@@ -6,7 +6,7 @@
 #ifndef BOOST_MMM_DETAIL_PHOENIX_MOVE_HPP
 #define BOOST_MMM_DETAIL_PHOENIX_MOVE_HPP
 
-#include <boost/mmm/detail/move.hpp>
+#include <boost/move/move.hpp>
 
 #include <boost/mpl/eval_if.hpp>
 #include <boost/type_traits/is_lvalue_reference.hpp>

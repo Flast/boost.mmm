@@ -17,7 +17,7 @@
 
 #include <boost/thread/thread.hpp>
 
-#include <boost/mmm/detail/move.hpp>
+#include <boost/move/move.hpp>
 
 namespace boost { namespace mmm {
 
@@ -41,17 +41,19 @@ class BOOST_THREAD_DECL thread : public boost::thread
     typedef boost::thread _base_t;
 
     // Ignoring original impls
-#if defined(BOOST_NO_RVALUE_REFERENCES)
+#if defined(BOOST_MMM_THREAD_HAS_MEMBER_MOVE)
+#   if defined(BOOST_NO_RVALUE_REFERENCES)
     using _base_t::operator BOOST_MMM_THREAD_RV_REF(boost::thread);
-#endif
+#   endif
     using _base_t::move;
+#endif
 
 public:
     thread() {}
 
     // Using Boost.Thread's Move Semantics to move.
     thread(BOOST_RV_REF(thread) other) BOOST_MMM_NOEXCEPT
-      : _base_t(other.move()) {}
+      : _base_t(boost::move(static_cast<boost::thread &>(other))) {}
 
 #if defined(BOOST_NO_VARIADIC_TEMPLATES)
 #define BOOST_MMM_thread_variadic_ctor(unused_r_, n_, unused_data_) \
@@ -72,7 +74,7 @@ public:
     thread &
     operator=(BOOST_RV_REF(thread) other) BOOST_MMM_NOEXCEPT
     {
-        _base_t::operator=(other.move());
+        _base_t::operator=(boost::move(static_cast<boost::thread &>(other)));
         return *this;
     }
 }; // class thread

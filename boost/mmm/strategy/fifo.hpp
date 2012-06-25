@@ -54,10 +54,10 @@ struct strategy_traits<strategy::fifo, Context, Allocator>
         BOOST_ASSERT(pool.size());
 
         // Call boost::move via ADL
-        context_type ctx = move(pool.front());
+        context_type ctx = boost::move(pool.front());
         pool.pop_front();
 
-        return move(ctx);
+        return boost::move(ctx);
     }
 
     /**
@@ -74,7 +74,7 @@ struct strategy_traits<strategy::fifo, Context, Allocator>
         pool_type &pool = traits.pool();
 
         // Call boost::move via ADL
-        pool.push_back(move(ctx));
+        pool.push_back(boost::move(ctx));
     }
 }; // template struct strategy_traits<strategy::fifo, C, A>
 

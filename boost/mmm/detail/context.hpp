@@ -17,7 +17,7 @@
 #include <boost/utility/value_init.hpp>
 
 #include <boost/noncopyable.hpp>
-#include <boost/mmm/detail/move.hpp>
+#include <boost/move/move.hpp>
 
 #include <boost/context/fcontext.hpp>
 #include <boost/context/stack_allocator.hpp>
@@ -175,12 +175,12 @@ public:
       : _m_data(new context_data_(f, size)) {}
 
     context(BOOST_RV_REF(context) other) BOOST_MMM_NOEXCEPT
-      : _m_data(move(other._m_data)) {}
+      : _m_data(boost::move(other._m_data)) {}
 
     context &
     operator=(BOOST_RV_REF(context) other) BOOST_MMM_NOEXCEPT
     {
-        context(move(other)).swap(*this);
+        context(boost::move(other)).swap(*this);
         return *this;
     }
 
@@ -290,10 +290,10 @@ public:
 
     explicit
     context_tuple(BOOST_RV_REF(context_type) ctx, io_callback_base *callback)
-      : _m_ctx(move(ctx)), _m_io_callback(callback) {}
+      : _m_ctx(boost::move(ctx)), _m_io_callback(callback) {}
 
     context_tuple(BOOST_RV_REF(context_tuple) other)
-      : _m_ctx(move(other._m_ctx))
+      : _m_ctx(boost::move(other._m_ctx))
       , _m_io_callback(other._m_io_callback)
     {
         other._m_io_callback = initialized_value;
@@ -302,7 +302,7 @@ public:
     context_tuple &
     operator=(BOOST_RV_REF(context_tuple) other)
     {
-        context_tuple(move(other)).swap(*this);
+        context_tuple(boost::move(other)).swap(*this);
         return *this;
     }
 

@@ -40,6 +40,7 @@
 
 #   define BOOST_MMM_THREAD_FUTURE unique_future
 #   define BOOST_MMM_THREAD_RV_REF(TYPE_) ::boost::detail::thread_move_t<TYPE_>
+#   define BOOST_MMM_THREAD_HAS_MEMBER_MOVE
 
 #else
 

@@ -10,7 +10,7 @@
 #include <boost/mmm/detail/workaround.hpp>
 
 #include <boost/ref.hpp>
-#include <boost/mmm/detail/move.hpp>
+#include <boost/move/move.hpp>
 #include <boost/swap.hpp>
 
 #include <boost/thread/locks.hpp>
@@ -55,7 +55,7 @@ public:
     unique_unlock &
     operator=(BOOST_RV_REF(unique_unlock) other) BOOST_MMM_NOEXCEPT
     {
-        unique_unlock(move(other)).swap(*this);
+        unique_unlock(boost::move(other)).swap(*this);
         return *this;
     }
 

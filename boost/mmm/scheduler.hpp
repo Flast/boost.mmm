@@ -17,7 +17,7 @@
 #include <boost/assert.hpp>
 #include <boost/ref.hpp>
 #include <boost/noncopyable.hpp>
-#include <boost/mmm/detail/move.hpp>
+#include <boost/move/move.hpp>
 
 #include <stdexcept>
 #include <boost/throw_exception.hpp>
@@ -207,7 +207,7 @@ private:
 
         if (data.async_pool && callback && callback->is_aggregatable())
         {
-            data.async_pool->push_ctx(move(ctx));
+            data.async_pool->push_ctx(boost::move(ctx));
         }
     }
 
@@ -261,7 +261,7 @@ private:
         current_context::set_current_ctx(&ctx);
         BOOST_MMM_THREAD_FUTURE<T> f(reinterpret_cast<promise<T> *>(fusion::at_c<0>(ctx).jump())->get_future());
         current_context::set_current_ctx(0);
-        return move(f);
+        return boost::move(f);
     }
 
     void
@@ -276,7 +276,7 @@ private:
 #if !defined(BOOST_MMM_CONTAINER_BREAKING_EMPLACE_RETURN_TYPE)
             std::pair<typename kernels_type::iterator, bool> r =
 #endif
-            _m_data->kernels.emplace(th.get_id(), move(th));
+            _m_data->kernels.emplace(th.get_id(), boost::move(th));
 #if !defined(BOOST_MMM_CONTAINER_BREAKING_EMPLACE_RETURN_TYPE)
             BOOST_ASSERT(r.second);
             BOOST_MMM_DETAIL_UNUSED(r);
@@ -296,7 +296,7 @@ public:
      * <b>Throws</b>: Nothing.
      */
     scheduler(BOOST_RV_REF(scheduler) other) BOOST_MMM_NOEXCEPT
-      : _m_data(move(other._m_data)) {}
+      : _m_data(boost::move(other._m_data)) {}
 
     /**
      * <b>Effects</b>: Construct with specified count <i>kernel-threads</i>
@@ -411,7 +411,7 @@ public:
         unique_lock<mutex> guard(_m_data->mtx);                             \
         strategy_traits().push_ctx(scheduler_traits(*this), move(ctx));     \
         _m_data->cond.notify_one();                                         \
-        return move(f);                                                     \
+        return boost::move(f);                                              \
     }                                                                       \
 // BOOST_MMM_scheduler_add_thread
     BOOST_PP_REPEAT(BOOST_PP_INC(BOOST_MMM_SCHEDULER_MAX_ARITY), BOOST_MMM_scheduler_add_thread, ~)
@@ -475,10 +475,10 @@ public:
         BOOST_MMM_THREAD_FUTURE<fn_result_type> f = start_context<fn_result_type>(ctx);
 
         unique_lock<mutex> guard(_m_data->mtx);
-        strategy_traits().push_ctx(scheduler_traits(*this), move(ctx));
+        strategy_traits().push_ctx(scheduler_traits(*this), boost::move(ctx));
         _m_data->cond.notify_one();
 
-        return move(f);
+        return boost::move(f);
     }
 #endif
 
