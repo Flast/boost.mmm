@@ -245,7 +245,7 @@ class async_io_thread : private noncopyable
         if (_m_pending_ctxs.size() != 0)
         {
             lock_guard<mutex> guard(_m_mtx);
-            boost::move(boost::begin(_m_pending_ctxs), boost::end(_m_pending_ctxs), back_move_inserter(_m_ctxact));
+            std::copy(boost::begin(_m_pending_ctxs), boost::end(_m_pending_ctxs), back_move_inserter(_m_ctxact));
             _m_pending_ctxs.clear();
         }
         for (iterator end = _m_ctxact.end(); ++itr != end; )
