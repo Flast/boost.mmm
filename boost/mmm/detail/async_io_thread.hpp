@@ -41,6 +41,7 @@
 #include <boost/mmm/detail/thread/sleep.hpp>
 
 #include <boost/system/error_code.hpp>
+#include <boost/mmm/detail/array_ref.hpp>
 #include <boost/mmm/detail/array_ref/container.hpp>
 #include <boost/mmm/io/detail/poll.hpp>
 

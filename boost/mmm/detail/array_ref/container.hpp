@@ -6,10 +6,12 @@
 #ifndef BOOST_MMM_DETAIL_ARRAY_REF_CONTAINER_HPP
 #define BOOST_MMM_DETAIL_ARRAY_REF_CONTAINER_HPP
 
-#include <boost/mmm/detail/array_ref.hpp>
 #include <boost/container/container_fwd.hpp>
 
 namespace boost { namespace mmm { namespace detail {
+
+template <typename>
+struct array_ref;
 
 template <typename T, typename A>
 inline array_ref<T>
