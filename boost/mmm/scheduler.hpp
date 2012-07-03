@@ -75,7 +75,7 @@ namespace boost { namespace mmm {
 namespace detail {
 
 struct disabling_asio_pool {}; // struct disabling_asio_pool
-BOOST_STATIC_CONSTEXPR disabling_asio_pool noasyncpool;
+BOOST_STATIC_CONSTEXPR disabling_asio_pool noasyncpool = {};
 
 } // namespace boost::mmm::detail
 

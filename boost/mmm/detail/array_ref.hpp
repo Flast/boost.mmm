@@ -72,20 +72,29 @@ private:
         BOOST_ASSERT(_m_ptr != 0 && _m_len != 0);
     }
 
+public:
     template <typename U>
-    inline friend array_ref<U>
-    make_array_ref(U *ptr, size_type len)
-    {
-        return array_ref<U>(ptr, len);
-    }
+    friend array_ref<U>
+    make_array_ref(U *, typename array_ref<U>::size_type);
 
-    template <typename U, size_type N>
-    inline friend array_ref<U>
-    make_array_ref(U (&arr)[N])
-    {
-        return array_ref<U>(arr, N);
-    }
+    template <typename U, typename array_ref<U>::size_type N>
+    friend array_ref<U>
+    make_array_ref(U (&)[N]);
 }; // template struct array_ref
+
+template <typename U>
+inline array_ref<U>
+make_array_ref(U *ptr, typename array_ref<U>::size_type len)
+{
+    return array_ref<U>(ptr, len);
+}
+
+template <typename U, typename array_ref<U>::size_type N>
+inline array_ref<U>
+make_array_ref(U (&arr)[N])
+{
+    return array_ref<U>(arr, N);
+}
 
 } } } // namespace boost::mmm::detail
 
