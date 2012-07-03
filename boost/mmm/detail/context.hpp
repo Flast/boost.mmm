@@ -28,6 +28,7 @@
 #include <boost/throw_exception.hpp>
 
 #include <boost/function.hpp>
+#include <boost/mmm/detail/task.hpp>
 #include <boost/phoenix/bind/bind_member_function.hpp>
 
 #include <boost/checked_delete.hpp>
@@ -77,7 +78,7 @@ private:
             {
                 try
                 {
-                    self._m_func();
+                    self._m_task();
                 }
                 catch (...)
                 {
@@ -103,10 +104,10 @@ private:
         }
 
     public:
-        context_data_(function<void()> f, std::size_t size)
+        context_data_(task t, std::size_t size)
           : _m_status(context_status_none), _m_fc(initialized_value)
           , _m_c_pfc(&_m_ofc), _m_o_pfc(&_m_fc)
-          , _m_func(f)
+          , _m_task(boost::move(t))
         {
             allocate_stack(size, ctx::stack_allocator());
             ctx::make_fcontext(&_m_fc, _m_executer);
@@ -156,7 +157,7 @@ private:
         atomic<status_t> _m_status;
         ctx::fcontext_t  _m_ofc, _m_fc;
         ctx::fcontext_t  *_m_c_pfc, *_m_o_pfc;
-        function<void()> _m_func;
+        task             _m_task;
         function<void()> _m_deallocate;
     }; // struct context::context_data_
 
@@ -169,10 +170,9 @@ private:
 public:
     context() {}
 
-    template <typename F>
     explicit
-    context(F f, std::size_t size = ctx::default_stacksize())
-      : _m_data(new context_data_(f, size)) {}
+    context(task t, std::size_t size = ctx::default_stacksize())
+      : _m_data(new context_data_(boost::move(t), size)) {}
 
     context(BOOST_RV_REF(context) other) BOOST_MMM_NOEXCEPT
       : _m_data(boost::move(other._m_data)) {}

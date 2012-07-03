@@ -82,7 +82,7 @@ BOOST_STATIC_CONSTEXPR disabling_asio_pool noasyncpool;
 using detail::noasyncpool;
 
 template <typename Strategy, typename Allocator = std::allocator<void> >
-struct scheduler;
+class scheduler;
 
 namespace detail {
 
@@ -247,23 +247,6 @@ private:
         }
     }
 
-    // To run context should call start(). However, cannot get informations
-    // about the context was started.
-    template <typename R, typename = void>
-    struct context_starter;
-
-    template <typename T>
-    static BOOST_MMM_THREAD_FUTURE<T>
-    start_context(context_type &ctx)
-    {
-        using namespace detail;
-
-        current_context::set_current_ctx(&ctx);
-        BOOST_MMM_THREAD_FUTURE<T> f(reinterpret_cast<promise<T> *>(fusion::at_c<0>(ctx).jump())->get_future());
-        current_context::set_current_ctx(0);
-        return boost::move(f);
-    }
-
     void
     _m_construct_thread_pool(const int default_count)
     {
@@ -400,13 +383,13 @@ public:
           result_of<fn_type(BOOST_MMM_enum_rmref_params(n_, Arg))>::type    \
         fn_result_type;                                                     \
                                                                             \
+        typedef detail::packaged_task<fn_result_type> packaged_task;        \
+        packaged_task ptask(phoenix::bind(fn BOOST_PP_ENUM_TRAILING_PARAMS(n_, arg)));   \
+        typename packaged_task::future_type f = ptask.get_future();         \
+        detail::task &task = ptask;                                         \
+                                                                            \
         context_type ctx;                                                   \
-        detail::context(                                                    \
-          phoenix::bind(                                                    \
-            context_starter<fn_result_type>(ctx)                            \
-          , fn BOOST_PP_ENUM_TRAILING_PARAMS(n_, arg))                      \
-        , size).swap(fusion::at_c<0>(ctx));                                 \
-        BOOST_MMM_THREAD_FUTURE<fn_result_type> f = start_context<fn_result_type>(ctx); \
+        detail::context(boost::move(task), size).swap(fusion::at_c<0>(ctx));\
                                                                             \
         unique_lock<mutex> guard(_m_data->mtx);                             \
         strategy_traits().push_ctx(scheduler_traits(*this), move(ctx));     \
@@ -468,11 +451,11 @@ public:
           result_of<fn_type(typename remove_reference<Args>::type...)>::type
         fn_result_type;
 
-        context_type ctx;
-        detail::context(
-          phoenix::bind(context_starter<fn_result_type>(ctx), fn, args...)
-        , size).swap(fusion::at_c<0>(ctx));
-        BOOST_MMM_THREAD_FUTURE<fn_result_type> f = start_context<fn_result_type>(ctx);
+        typedef detail::packaged_task<fn_result_type> packaged_task;
+        packaged_task task(phoenix::bind(fn, args...));
+        typename packaged_task::future_type f = task.get_future();
+
+        context_type ctx(detail::context(boost::move(task), size));
 
         unique_lock<mutex> guard(_m_data->mtx);
         strategy_traits().push_ctx(scheduler_traits(*this), boost::move(ctx));
@@ -570,86 +553,6 @@ private:
 
     scheduler_data_ptr _m_data;
 }; // template class scheduler
-
-#if !defined(BOOST_MMM_DOXYGEN_INVOKED)
-template <typename Strategy, typename Allocator>
-template <typename R, typename>
-struct scheduler<Strategy, Allocator>::context_starter
-{
-    typedef void result_type;
-
-    typedef typename scheduler<Strategy, Allocator>::context_type context_type;
-    reference_wrapper<context_type> _m_ctx;
-
-    explicit
-    context_starter(context_type &ctx)
-      : _m_ctx(ctx) {}
-
-#if defined(BOOST_NO_VARIADIC_TEMPLATES)
-#define BOOST_MMM_context_starter_op_call(unused_z_, n_, unused_data_)  \
-    template <typename Fn BOOST_PP_ENUM_TRAILING_PARAMS(n_, typename Arg)> \
-    void                                                                \
-    operator()(Fn &fn BOOST_PP_ENUM_TRAILING_BINARY_PARAMS(n_, Arg, &arg)) const \
-    {                                                                   \
-        promise<R> p;                                                   \
-        fusion::at_c<0>(unwrap_ref(_m_ctx)).jump(&p);                   \
-        p.set_value(fn(BOOST_PP_ENUM_PARAMS(n_, arg)));                 \
-    }                                                                   \
-// BOOST_MMM_context_starter_op_call
-    BOOST_PP_REPEAT(BOOST_PP_INC(BOOST_MMM_SCHEDULER_MAX_ARITY), BOOST_MMM_context_starter_op_call, ~)
-#undef BOOST_MMM_context_starter_op_call
-#else
-    template <typename Fn, typename... Args>
-    void
-    operator()(Fn &fn, Args &... args) const
-    {
-        promise<R> p;
-        fusion::at_c<0>(unwrap_ref(_m_ctx)).jump(&p);
-        p.set_value(fn(args...));
-    }
-#endif
-}; // template struct scheduler::context_starter
-
-template <typename Strategy, typename Allocator>
-template <typename Dummy>
-struct scheduler<Strategy, Allocator>::context_starter<void, Dummy>
-{
-    typedef void result_type;
-
-    typedef typename scheduler<Strategy, Allocator>::context_type context_type;
-    reference_wrapper<context_type> _m_ctx;
-
-    explicit
-    context_starter(context_type &ctx)
-      : _m_ctx(ctx) {}
-
-#if defined(BOOST_NO_VARIADIC_TEMPLATES)
-#define BOOST_MMM_context_starter_op_call(unused_z_, n_, unused_data_)  \
-    template <typename Fn BOOST_PP_ENUM_TRAILING_PARAMS(n_, typename Arg)> \
-    void                                                                \
-    operator()(Fn &fn BOOST_PP_ENUM_TRAILING_BINARY_PARAMS(n_, Arg, &arg)) const \
-    {                                                                   \
-        promise<void> p;                                                \
-        fusion::at_c<0>(unwrap_ref(_m_ctx)).jump(&p);                   \
-        fn(BOOST_PP_ENUM_PARAMS(n_, arg));                              \
-        p.set_value();                                                  \
-    }                                                                   \
-// BOOST_MMM_context_starter_op_call
-    BOOST_PP_REPEAT(BOOST_PP_INC(BOOST_MMM_SCHEDULER_MAX_ARITY), BOOST_MMM_context_starter_op_call, ~)
-#undef BOOST_MMM_context_starter_op_call
-#else
-    template <typename Fn, typename... Args>
-    void
-    operator()(Fn &fn, Args &... args) const
-    {
-        promise<void> p;
-        fusion::at_c<0>(unwrap_ref(_m_ctx)).jump(&p);
-        fn(args...);
-        p.set_value();
-    }
-#endif
-}; // template struct scheduler::context_starter
-#endif
 
 } } // namespace boost::mmm
 
