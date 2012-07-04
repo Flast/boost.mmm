@@ -7,6 +7,7 @@ namespace mmm = boost::mmm;
 
 #include <boost/test/minimal.hpp>
 
+#ifndef BOOST_THREAD_USES_MOVE
 template <typename T>
 struct adapt_thread_move : public T
 {
@@ -25,10 +26,22 @@ struct adapt_thread_move : public T
         return boost::detail::thread_move_t<adapt_thread_move>(*this);
     }
 
-    explicit
+    operator boost::detail::thread_move_t<adapt_thread_move>()
+    {
+        return move();
+    }
+
     adapt_thread_move(T &obj)
       : T(boost::move(obj)) {}
 };
+
+template <typename T>
+inline boost::detail::thread_move_t<adapt_thread_move<T> >
+adapt_move(adapt_thread_move<T> atm) { return atm.move(); }
+#   define ADAPT_MOVE(type_) (boost::detail::thread_move_t<adapt_thread_move<type_> >)adapt_thread_move<type_>
+#else
+#   define ADAPT_MOVE(type_) boost::move
+#endif
 
 int nonthrow_task()
 {
@@ -41,7 +54,7 @@ int test_nonthrow()
 {
     mmm::detail::packaged_task<int> nt_pt(nonthrow_task);
     mmm::detail::packaged_task<int>::future_type nt_f = nt_pt.get_future();
-    boost::thread th(adapt_thread_move<mmm::detail::packaged_task<int> >(nt_pt).move());
+    boost::thread th(ADAPT_MOVE(mmm::detail::packaged_task<int>)(nt_pt));
     BOOST_REQUIRE(nt_f.get() == 1);
     th.join();
 
@@ -58,7 +71,7 @@ int test_throw()
 {
     mmm::detail::packaged_task<void> t_pt(throw_task);
     mmm::detail::packaged_task<void>::future_type t_f = t_pt.get_future();
-    boost::thread th(adapt_thread_move<mmm::detail::packaged_task<void> >(t_pt).move());
+    boost::thread th(ADAPT_MOVE(mmm::detail::packaged_task<void>)(t_pt));
     try
     {
         t_f.get();
