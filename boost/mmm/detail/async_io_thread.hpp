@@ -123,6 +123,8 @@ class async_io_thread : private noncopyable
         }
 
         this_thread::sleep_for(poll_TO);
+
+        err_code.clear();
         return 0;
     }
 
