@@ -14,7 +14,7 @@ Depends:
 >
 > * [Boost](http://www.boost.org/) 1.48.0 or later
 > * [Boost.Context](http://www.boost.org/) (in trunk)
-> * [Boost.Atomic](http://www.chaoticmind.net/~hcb/projects/boost.atomic/) (not in trunk)
+> * [Boost.Atomic](http://www.chaoticmind.net/~hcb/projects/boost.atomic/) (in trunk)
 
 License:
 --------
