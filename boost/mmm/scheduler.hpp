@@ -365,6 +365,7 @@ public:
         typedef typename kernels_type::iterator iterator;
         typedef typename kernels_type::const_iterator const_iterator;
 
+        _m_data->async_pool.reset();
         const_iterator end = _m_data->kernels.end();
         for (iterator itr = _m_data->kernels.begin(); itr != end; ++itr)
         {
